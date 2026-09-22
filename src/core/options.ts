@@ -81,8 +81,8 @@ export function resolveOptions(options: AstroDomStampOptions): ResolvedOptions {
     enabled: options.enabled ?? false,
     sources: [...(options.sources ?? [])],
     skipFields,
-    include: [...(options.include ?? DEFAULT_INCLUDE)],
-    exclude: [...(options.exclude ?? DEFAULT_EXCLUDE)],
+    include: (options.include ?? [...DEFAULT_INCLUDE]).map(anchorGlob),
+    exclude: (options.exclude ?? [...DEFAULT_EXCLUDE]).map(anchorGlob),
     stripAfterStamp: options.stripAfterStamp ?? false,
     devWarnings: options.devWarnings ?? true,
   };
@@ -93,4 +93,11 @@ export function kebabCase(key: string): string {
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .replace(/[_\s]+/g, '-')
     .toLowerCase();
+}
+
+// Vite passes absolute ids, so a project-relative glob like `src/**/*.ts` would
+// never match. Anchoring it lets the documented form work as written.
+function anchorGlob(glob: string): string {
+  if (glob.startsWith('**/') || glob.startsWith('/') || /^[A-Za-z]:/.test(glob)) return glob;
+  return `**/${glob.replace(/^\.\//, '')}`;
 }

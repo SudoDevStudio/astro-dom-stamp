@@ -9,20 +9,22 @@ production.
 npm install @sudodevstudio/astro-dom-stamp
 ```
 
-> **Status: Phase 1.** The encoder, the browser stamper and `clean()` are built,
-> tested and measured. The build-time transform that wraps your fetch calls
-> automatically is Phase 2 — until then you call `encode()` yourself at each
-> fetch point. See [Roadmap](#roadmap).
+> **Status: Phase 2.** The build-time transform, the encoder, the browser
+> stamper and `clean()` are built, tested and verified end to end through a real
+> Astro SSR build. React-specific work (browser-side fetch, hooks) is Phase 3.
+> See [Roadmap](#roadmap).
 
 ## How it works
 
 Three pieces, all of which exist only in an edit build:
 
-1. **Encoder.** Every string in a fetch result gets an invisible marker
+1. **Transform.** A Vite plugin wraps each fetch point in your `src/` — nothing
+   in your templates changes, and nothing on disk changes.
+2. **Encoder.** Every string in a fetch result gets an invisible marker
    appended, carrying the id of the nearest object that has one.
-2. **SSR.** Those strings render into HTML and into hydrated island props. The
+3. **SSR.** Those strings render into HTML and into hydrated island props. The
    markers travel with them, because they are just characters in a string.
-3. **Browser stamper.** It reads the markers back out of the DOM, works out
+4. **Browser stamper.** It reads the markers back out of the DOM, works out
    which element each entity belongs to, writes the attributes, and keeps
    watching for nodes that appear later.
 
@@ -56,22 +58,50 @@ This gating is **build time**, which assumes preview and production are separate
 builds. If one artifact is deployed to both, build-time gating cannot work —
 see [Limitations](#limitations).
 
-### Encoding your data (Phase 1)
+## What gets wrapped
 
-Until the transform lands, wrap each fetch result yourself:
+Your source files are not edited. Only the code the edit build compiles changes:
+
+```ts
+// your file, unchanged
+const products = await (await fetch(API)).json();
+
+// what the edit build compiles
+const products = await __encode((await fetch(API)).json());
+```
+
+Every `.json()` call with no arguments is wrapped, wherever it sits:
+
+| Your code | Edit build |
+| --- | --- |
+| `await res.json()` | `await __encode(res.json())` |
+| `fetch(u).then((r) => r.json())` | `fetch(u).then((r) => __encode(r.json()))` |
+| `return res.json()` | `return __encode(res.json())` |
+
+There is one rule rather than one per shape, because `__encode` takes a promise
+as readily as a value. Anything else you fetch through goes in `sources`:
+
+```js
+astroDomStamp({
+  read: ['id', 'uid', 'sku'],
+  enabled: process.env.ASTRO_DOM_STAMP_EDIT === 'true',
+  sources: ['client.query', 'request', 'useQuery'],
+});
+```
+
+Those are wrapped with `__encodeResult`, which copies rather than marking in
+place, because a GraphQL cache entry or a hook result may be shared or frozen.
+A dotted name also matches by its tail, so `client.query` covers
+`this.client.query`. Files are matched by `include` / `exclude`, and a file with
+no fetch point is never parsed.
+
+If you need to encode something the transform cannot reach, do it yourself:
 
 ```ts
 import { createEncoder } from '@sudodevstudio/astro-dom-stamp/runtime';
 
-const { __encode, __encodeResult } = createEncoder({
-  read: ['id', 'uid', 'sku'],
-});
-
-// A fresh parse: marked in place, nothing cloned.
-const products = __encode(await res.json());
-
-// A shared or frozen result — a GraphQL cache entry, a hook result.
-const data = __encodeResult(useQuery(PRODUCTS).data);
+const { __encode } = createEncoder({ read: ['id', 'uid', 'sku'] });
+const products = __encode(await db.products.findMany());
 ```
 
 ## Where the attribute lands
@@ -111,10 +141,10 @@ left exactly where it was.
 | --- | --- | --- | --- |
 | `read` | `string[]` | **required** | Keys that become attributes. `id` → `data-id`, `productId` → `data-product-id`. |
 | `enabled` | `boolean` | `false` | `true` for the edit build. `false` registers nothing at all. |
-| `sources` | `string[]` | `[]` | Extra data sources for the transform, e.g. `client.query`, `useQuery`. (Phase 2/3.) |
+| `sources` | `string[]` | `[]` | Extra call expressions to wrap, e.g. `client.query`, `useQuery`. |
 | `skipFields` | `string[]` | see below | Extra keys whose values are never marked. |
-| `include` | `string[]` | `src/**/*.{astro,ts,js,mjs,tsx,jsx}` | Files the transform covers. (Phase 2.) |
-| `exclude` | `string[]` | `**/node_modules/**` | Files it skips. (Phase 2.) |
+| `include` | `string[]` | `src/**/*.{astro,ts,js,mjs,tsx,jsx}` | Files the transform covers. A project-relative glob is anchored for you, since Vite passes absolute ids. |
+| `exclude` | `string[]` | `**/node_modules/**` | Files it skips. |
 | `stripAfterStamp` | `boolean` | `false` | Remove markers from the text once the attribute is on. |
 | `devWarnings` | `boolean` | `true` | Warn about collisions and markers in unsafe places. |
 
@@ -144,6 +174,7 @@ Node 22.22 on an Apple Silicon laptop. Reproduce with `npm run bench`,
 | Where | Measurement | Target |
 | --- | --- | --- |
 | Production | nothing is included | 0 |
+| Build | **+6.9%** over 1000 modules that all contain a fetch point | < 10% |
 | Server | **~6 ms** to encode a 1000-product response (8001 objects, 32000 strings) | < 20 ms/request |
 | Browser | **~2.3 ms** first scan on a 806-element page; ~10.5 ms at 3206 elements | < 50 ms |
 | HTML | **~360 B raw per marker, ~12 B after gzip** | measure and decide |
@@ -180,7 +211,8 @@ them as an upper bound. Scan time grows linearly with element count.
 
 1. ✅ **Phase 1** — encoder, stamper, `clean()`, tests, benchmarks; Astro plugin
    order, Gurmukhi and emoji rendering, and gzipped HTML size all verified.
-2. **Phase 2** — build-time transform for `.astro` and `.ts/.js` helpers.
+2. ✅ **Phase 2** — build-time transform for `.astro` and `.ts/.js` helpers,
+   verified end to end against a real Astro SSR build.
 3. **Phase 3** — React: `.tsx/.jsx`, browser-side fetch, hooks named in `sources`.
 4. **Phase 4** — preview deployment against real pages.
 5. **Phase 5** — Vue and Svelte.

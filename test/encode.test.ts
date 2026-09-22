@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decodeStamps } from '../src/core/clean.js';
 import { encode, encodeResult } from '../src/core/encode.js';
+import { createEncoder } from '../src/runtime/encode.js';
 import { hasMarker } from '../src/core/marker.js';
 import type { Stamp } from '../src/core/types.js';
 import { defaultSettings, settingsFor } from './settings.js';
@@ -202,5 +203,30 @@ describe('mutation policy', () => {
     const input = { id: '5', box: new Box() };
     encode(input, defaultSettings);
     expect(input.box.title).toBe('Shoe');
+  });
+});
+
+describe('createEncoder', () => {
+  const encoder = createEncoder({ read: ['id', 'uid', 'sku'] });
+
+  it('encodes a plain value', () => {
+    expect(hasMarker(encoder.__encode({ id: '5', title: 'Shoe' }).title)).toBe(true);
+  });
+
+  it('encodes through a promise, as the transform hands it', async () => {
+    const data = await encoder.__encode(Promise.resolve({ id: '5', title: 'Shoe' }));
+    expect(hasMarker(data.title)).toBe(true);
+  });
+
+  it('encodes a shared result through a promise', async () => {
+    const input = Object.freeze({ id: '5', title: 'Shoe' });
+    const data = await encoder.__encodeResult(Promise.resolve(input));
+    expect(hasMarker(data.title)).toBe(true);
+    expect(input.title).toBe('Shoe');
+  });
+
+  it('passes a non-object through untouched', () => {
+    expect(encoder.__encode(null)).toBeNull();
+    expect(encoder.__encode('plain')).toBe('plain');
   });
 });

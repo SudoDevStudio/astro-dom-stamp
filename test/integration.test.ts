@@ -39,7 +39,10 @@ describe('edit build', () => {
     expect(injected[0]).toContain('"data-sku"');
 
     const plugins = (configs[0] as { vite: { plugins: Array<{ name: string }> } }).vite.plugins;
-    expect(plugins.map((p) => p.name)).toEqual(['astro-dom-stamp:runtime']);
+    expect(plugins.map((p) => p.name)).toEqual([
+      'astro-dom-stamp:transform',
+      'astro-dom-stamp:runtime',
+    ]);
   });
 
   it('serves a runtime module with the options already baked in', () => {
@@ -50,9 +53,15 @@ describe('edit build', () => {
 
     const plugin = (
       configs[0] as {
-        vite: { plugins: Array<{ resolveId(id: string): string | null; load(id: string): string | null }> };
+        vite: {
+          plugins: Array<{
+            name: string;
+            resolveId(id: string): string | null;
+            load(id: string): string | null;
+          }>;
+        };
       }
-    ).vite.plugins[0]!;
+    ).vite.plugins.find((p) => p.name === 'astro-dom-stamp:runtime')!;
 
     const resolved = plugin.resolveId('virtual:astro-dom-stamp/runtime');
     expect(resolved).toBe('\0virtual:astro-dom-stamp/runtime');
@@ -62,5 +71,8 @@ describe('edit build', () => {
     expect(code).toContain('export const __encode');
     expect(code).toContain('export const __encodeResult');
     expect(code).toContain('"variant"');
+    // Must go through createEncoder: the transform passes promises as well as
+    // values, and the raw encode functions would return a promise untouched.
+    expect(code).toContain('createEncoder');
   });
 });

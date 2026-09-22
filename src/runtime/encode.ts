@@ -6,12 +6,31 @@ export interface Encoder {
   __encodeResult<T>(value: T): T;
 }
 
+function isThenable(value: unknown): value is PromiseLike<unknown> {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as PromiseLike<unknown>).then === 'function'
+  );
+}
+
+/**
+ * Both helpers accept a promise as well as a value, which is what lets the
+ * transform wrap any call site without inspecting its parent: `res.json()`,
+ * `await res.json()` and `res.json().then(...)` all go through the same edit.
+ */
 export function createEncoder(options: AstroDomStampOptions): Encoder {
   const resolved = resolveOptions(options);
   const settings: EncodeSettings = { read: resolved.read, skipFields: resolved.skipFields };
   return {
-    __encode: (value) => encode(value, settings),
-    __encodeResult: (value) => encodeResult(value, settings),
+    __encode: (value) =>
+      isThenable(value)
+        ? (value.then((resolved) => encode(resolved, settings)) as typeof value)
+        : encode(value, settings),
+    __encodeResult: (value) =>
+      isThenable(value)
+        ? (value.then((resolved) => encodeResult(resolved, settings)) as typeof value)
+        : encodeResult(value, settings),
   };
 }
 

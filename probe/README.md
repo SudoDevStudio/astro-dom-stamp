@@ -48,3 +48,33 @@ Two things follow for the design:
 **Caveat to re-check on upgrade:** this is behaviour, not a documented
 guarantee. The probe is cheap — re-run it when bumping Astro, and treat a
 `fence=True` row as a signal that the Astro parser path is needed after all.
+
+## `e2e` — does the whole pipeline work in a real Astro build?
+
+**Question:** the unit tests cover each piece on its own. Do the transform, the
+encoder, SSR and the stamper actually line up inside a real Astro SSR build?
+
+**Method:** build a small SSR project twice — once with `ASTRO_DOM_STAMP_EDIT=true`
+and once without — start the standalone Node server each time, fetch the page,
+and check the HTML that comes back. The edit HTML is then run through the real
+browser stamper under jsdom.
+
+```sh
+npm run build && node probe/e2e/check.mjs
+```
+
+**Result — Astro 7.3.3, `@astrojs/node` standalone, Node 22.22:** all nine
+checks pass. The edit build wraps the `.json()` call, the SSR HTML carries
+markers that decode back to the fetched ids and list indices, the stamper puts
+`data-id` and `data-sku` on each `<li class="card">` — the `.map()` element, not
+the text element — and the production HTML is byte-identical to the edit HTML
+once markers and the injected script are removed.
+
+**Two bugs this caught that the unit tests could not:**
+
+1. The default `include` glob was `src/**/*.{...}`, which never matches the
+   absolute ids Vite passes. Project-relative globs are now anchored.
+2. The virtual runtime module exported the raw `encode` rather than going
+   through `createEncoder`, so `__encode(res.json())` was handed a promise and
+   returned it untouched. Both the unit tests and the transform were correct in
+   isolation; only running them together showed it.

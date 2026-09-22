@@ -150,3 +150,6 @@ probe/**/probe-result.json
 
 # Build output
 dist/
+
+# Generated build-time benchmark project
+bench/build/project/

@@ -1,5 +1,6 @@
 import type { AstroIntegration } from 'astro';
 import { resolveOptions, type AstroDomStampOptions, type ResolvedOptions } from './core/options.js';
+import { createTransformPlugin } from './transform/plugin.js';
 
 export type { AstroDomStampOptions, ResolvedOptions } from './core/options.js';
 export type { ListRef, Stamp } from './core/types.js';
@@ -28,7 +29,7 @@ export default function astroDomStamp(options: AstroDomStampOptions): AstroInteg
         logger.info('edit mode on: markers and the browser stamper are in this build.');
         updateConfig({
           vite: {
-            plugins: [runtimeModulePlugin(options, resolved)],
+            plugins: [createTransformPlugin(resolved), runtimeModulePlugin(options, resolved)],
           },
         });
         injectScript('page', stamperEntry(resolved));
@@ -47,12 +48,13 @@ function runtimeModulePlugin(options: AstroDomStampOptions, resolved: ResolvedOp
     },
     load(id: string) {
       if (id !== RESOLVED_RUNTIME) return null;
+      // Goes through createEncoder, not the raw encode functions, because the
+      // transform hands these a promise as often as a value.
       return [
-        `import { encode, encodeResult } from '@sudodevstudio/astro-dom-stamp/runtime';`,
-        `const settings = ${settings};`,
-        `settings.skipFields = new Set(settings.skipFields);`,
-        `export const __encode = (value) => encode(value, settings);`,
-        `export const __encodeResult = (value) => encodeResult(value, settings);`,
+        `import { createEncoder } from '@sudodevstudio/astro-dom-stamp/runtime';`,
+        `const encoder = createEncoder(${settings});`,
+        `export const __encode = encoder.__encode;`,
+        `export const __encodeResult = encoder.__encodeResult;`,
       ].join('\n');
     },
   };
