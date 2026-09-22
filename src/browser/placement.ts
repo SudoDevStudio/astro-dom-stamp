@@ -1,14 +1,6 @@
 import type { Stamp } from '../core/types.js';
 
-/**
- * Turning decoded markers into "which element gets the attribute".
- *
- * Kept free of scanning and DOM mutation so the rules can be exercised against
- * plain markup in tests.
- */
-
 export interface Occurrence {
-  /** Element directly holding the marked text, or holding the marked `alt`. */
   element: Element;
   stamp: Stamp;
   key: string;
@@ -26,7 +18,6 @@ interface Group {
   elements: Element[];
 }
 
-/** An ancestor that covers more than one item of the same list. */
 const MIXED = -1;
 
 export function resolvePlacements(occurrences: Occurrence[]): Placement[] {
@@ -34,12 +25,14 @@ export function resolvePlacements(occurrences: Occurrence[]): Placement[] {
   for (const occurrence of occurrences) {
     const existing = groups.get(occurrence.key);
     if (existing) existing.elements.push(occurrence.element);
-    else groups.set(occurrence.key, { key: occurrence.key, stamp: occurrence.stamp, elements: [occurrence.element] });
+    else
+      groups.set(occurrence.key, {
+        key: occurrence.key,
+        stamp: occurrence.stamp,
+        elements: [occurrence.element],
+      });
   }
 
-  // A list only behaves like a list once two of its items are actually on the
-  // page. With one item rendered there is no container to find, so it falls
-  // back to the single-object rule.
   const renderedIndices = new Map<string, Set<number>>();
   for (const group of groups.values()) {
     const list = group.stamp.list;
@@ -51,6 +44,8 @@ export function resolvePlacements(occurrences: Occurrence[]): Placement[] {
 
   const ownership = new Map<string, Map<Element, number>>();
   for (const [ref, indices] of renderedIndices) {
+    // With one item rendered there is no container to find, so it falls back
+    // to the single-object rule.
     if (indices.size < 2) continue;
     ownership.set(ref, buildOwnership(ref, groups));
   }
@@ -69,10 +64,11 @@ export function resolvePlacements(occurrences: Occurrence[]): Placement[] {
 }
 
 /**
- * Marks every ancestor of every occurrence with the list index beneath it, or
- * MIXED once two indices meet. One pass up from each element, breaking as soon
- * as it reaches ground a previous climb already covered, so the total work is
- * proportional to the elements involved rather than to items squared.
+ * Marks every ancestor with the list index beneath it, or MIXED once two
+ * indices meet. Both early breaks are safe because every climb runs to the
+ * root: reaching a node already marked with this index means the rest of the
+ * chain was marked by an earlier climb, and reaching MIXED means everything
+ * above it is MIXED too.
  */
 function buildOwnership(ref: string, groups: Map<string, Group>): Map<Element, number> {
   const owners = new Map<Element, number>();
@@ -89,7 +85,6 @@ function buildOwnership(ref: string, groups: Map<string, Group>): Map<Element, n
           continue;
         }
         if (seen === list.index || seen === MIXED) break;
-        // Two indices meet here; everything above covers both.
         while (node && owners.get(node) !== MIXED) {
           owners.set(node, MIXED);
           node = node.parentElement;
@@ -101,7 +96,6 @@ function buildOwnership(ref: string, groups: Map<string, Group>): Map<Element, n
   return owners;
 }
 
-/** The highest ancestor still covering only this item — the `.map()` element. */
 function climbToItemRoot(anchor: Element, owners: Map<Element, number>, index: number): Element {
   let target = anchor;
   for (;;) {
@@ -128,7 +122,6 @@ function ancestorOfPair(a: Element, b: Element): Element | null {
   return node;
 }
 
-/** `<html>` and `<body>` are never a sensible editing target. */
 function isStampable(element: Element): boolean {
   const tag = element.tagName;
   return tag !== 'BODY' && tag !== 'HTML';

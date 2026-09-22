@@ -10,10 +10,7 @@ import { measure, report } from './measure.ts';
 const resolved = resolveOptions({ read: ['id', 'uid', 'sku'] });
 const settings = { read: resolved.read, skipFields: resolved.skipFields };
 
-/**
- * jsdom is slower than a browser engine, so treat these as an upper bound and a
- * regression guard rather than as the field number.
- */
+// jsdom is slower than a real engine, so these are an upper bound.
 const SIZES = [50, 200];
 
 const rows = [];

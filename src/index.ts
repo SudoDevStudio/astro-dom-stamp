@@ -10,15 +10,11 @@ const VIRTUAL_RUNTIME = 'virtual:astro-dom-stamp/runtime';
 const RESOLVED_RUNTIME = '\0' + VIRTUAL_RUNTIME;
 
 /**
- * Stamps `data-*` attributes derived from fetched data onto the elements that
- * render it, for a custom visual editor.
- *
- * With `enabled: false` this registers nothing — no Vite plugin, no runtime
- * import, no injected script — so a production build is byte-identical to one
- * without the integration installed.
+ * With `enabled: false` this registers nothing, so a production build is
+ * byte-identical to one without the integration installed.
  */
 export default function astroDomStamp(options: AstroDomStampOptions): AstroIntegration {
-  // Validate even when disabled, so a typo surfaces in the production build too.
+  // Validated even when disabled, so a typo fails the production build too.
   const resolved = resolveOptions(options);
 
   if (!resolved.enabled) {
@@ -41,10 +37,6 @@ export default function astroDomStamp(options: AstroDomStampOptions): AstroInteg
   };
 }
 
-/**
- * Serves the encoder with this project's options already baked in, so the
- * transform can emit a bare `__encode(...)` call with no config plumbing.
- */
 function runtimeModulePlugin(options: AstroDomStampOptions, resolved: ResolvedOptions) {
   const settings = JSON.stringify({ read: resolved.read, skipFields: [...resolved.skipFields] });
   return {

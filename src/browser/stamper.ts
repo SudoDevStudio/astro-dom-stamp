@@ -4,27 +4,19 @@ import type { Stamp } from '../core/types.js';
 import { resolvePlacements, type Occurrence } from './placement.js';
 
 export interface StamperConfig {
-  /** read key -> attribute name, e.g. `{ id: 'data-id' }`. */
   attributes: Record<string, string>;
   stripAfterStamp: boolean;
   devWarnings: boolean;
 }
 
 export interface Stamper {
-  /** Scan the whole document once, now. */
   scan(): void;
-  /** First scan when the page is idle, then keep watching for new nodes. */
   start(): void;
   stop(): void;
 }
 
-/** Subtrees whose text is never rendered prose. */
 const SKIP_TAGS = new Set(['SCRIPT', 'STYLE', 'TEXTAREA', 'NOSCRIPT', 'TITLE', 'HEAD', 'TEMPLATE']);
 
-/**
- * A marker here means a CMS field that feeds logic, not prose, slipped through
- * the skip rules — the author should add that key to `skipFields`.
- */
 const UNSAFE_ATTRIBUTES = ['class', 'id', 'href', 'src', 'style'];
 
 const LOG_PREFIX = '[astro-dom-stamp]';
@@ -117,11 +109,10 @@ export function createStamper(config: StamperConfig): Stamper {
       observer!.observe(document.body, { childList: true, subtree: true, characterData: true });
       schedule();
     };
-    // Islands finish hydrating before `load`; scanning first would put
+    // Islands finish hydrating before `load`; scanning earlier would put
     // attributes on nodes React is about to reconcile.
     if (document.readyState === 'complete') begin();
     else window.addEventListener('load', begin, { once: true });
-    // Astro view transitions swap the whole document.
     document.addEventListener('astro:page-load', schedule);
   }
 
@@ -173,7 +164,6 @@ function writeAttributes(element: Element, stamp: Stamp, config: StamperConfig):
   for (const key in stamp.fields) {
     const attribute = config.attributes[key];
     if (!attribute) continue;
-    // Hand-written markup wins: the author meant that value.
     if (element.hasAttribute(attribute)) continue;
     element.setAttribute(attribute, stamp.fields[key]!);
   }

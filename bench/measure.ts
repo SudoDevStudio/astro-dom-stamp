@@ -6,7 +6,6 @@ export interface Measurement {
   minMs: number;
 }
 
-/** Times `run`, discarding warm-up iterations so JIT noise stays out. */
 export function measure(label: string, run: () => void, runs = 30, warmup = 5): Measurement {
   for (let i = 0; i < warmup; i++) run();
   const samples: number[] = [];

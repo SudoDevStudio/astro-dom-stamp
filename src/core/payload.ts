@@ -1,19 +1,10 @@
 import type { ListRef, Stamp } from './types.js';
 
-/**
- * Payload text, e.g. `v1|id=5|sku=AB-1|L=a7:2`.
- *
- * Only the keys an object actually carried are written, because every byte here
- * costs four invisible characters in the HTML. `L` holds the list reference and
- * index, which is how the browser tells `.map()` siblings apart.
- */
-
 const VERSION = 'v1';
 
 /** Payload key holding the list reference. Not usable as a `read` key. */
 export const LIST_KEY = 'L';
 
-/** `\` and the two structural characters have to survive a round trip. */
 function escape(value: string): string {
   let out = '';
   for (let i = 0; i < value.length; i++) {
@@ -35,7 +26,6 @@ export function serializeStamp(stamp: Stamp): string {
   return out;
 }
 
-/** Splits on unescaped `|`, then each field on its first unescaped `=`. */
 export function parseStamp(payload: string): Stamp | null {
   const parts = splitRaw(payload, '|');
   if (parts.length === 0 || !/^v\d+$/.test(parts[0]!)) return null;
@@ -63,11 +53,8 @@ export function parseStamp(payload: string): Stamp | null {
   return list ? { fields, list } : { fields };
 }
 
-/**
- * Splits on unescaped separators while leaving the escapes in place. Unescaping
- * has to happen once, after the last split — doing it during the `|` pass would
- * make the `=` pass unescape an already-unescaped value a second time.
- */
+// Splits without unescaping: unescaping has to happen once, after the last
+// split, or the `=` pass would unescape what the `|` pass already did.
 function splitRaw(text: string, separator: string, limit = Infinity): string[] {
   const parts: string[] = [];
   let current = '';
@@ -99,10 +86,6 @@ function unescape(text: string): string {
   return out;
 }
 
-/**
- * Identity for collision detection in the browser: two markers with the same
- * key describe the same entity in the same list slot.
- */
 export function stampKey(stamp: Stamp): string {
   return serializeStamp(stamp);
 }

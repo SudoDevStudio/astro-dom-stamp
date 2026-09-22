@@ -8,29 +8,19 @@ export interface EncodeSettings {
   skipFields: ReadonlySet<string>;
 }
 
-/**
- * Deepest structure we will descend into. Cycles are caught separately; this
- * only guards the stack against pathologically nested API responses.
- */
 const MAX_DEPTH = 64;
 
-/**
- * List references only have to be unique inside one rendered document, but a
- * single SSR process renders many. One monotonic counter for the whole process
- * is the cheapest way to guarantee that without tracking request scope.
- */
+// One counter for the whole process. List references only have to be unique
+// within a rendered document, and a monotonic counter guarantees that without
+// tracking request scope.
 let listRefCounter = 0;
 function nextListRef(): string {
   return (listRefCounter++).toString(36);
 }
 
-/** Objects already encoded in place, so a cached `res.json()` is not marked twice. */
 const encodedInPlace = new WeakSet<object>();
-
-/** Input -> output for copy mode, so one input always yields one output. */
 const copies = new WeakMap<object, unknown>();
 
-/** Array slot an object sits in. The ref is allocated only if an item owns strings. */
 interface ListSlot {
   box: { ref: string | null };
   index: number;
@@ -43,10 +33,7 @@ interface WalkState {
   seen: WeakSet<object>;
 }
 
-/**
- * Encodes a fresh `res.json()` result in place. Cheapest path: nothing is
- * cloned, and the object graph is walked once.
- */
+/** For a fresh `res.json()` result: encoded in place, nothing cloned. */
 export function encode<T>(value: T, settings: EncodeSettings): T {
   if (!isWalkable(value)) return value;
   if (encodedInPlace.has(value as object)) return value;
@@ -61,10 +48,8 @@ export function encode<T>(value: T, settings: EncodeSettings): T {
 }
 
 /**
- * Encodes a result that may be shared or frozen — a GraphQL cache entry, a hook
- * result — by copying it. The copy is memoised on the input, so a component
- * that re-renders with the same cache object keeps the same encoded object and
- * React sees a stable reference.
+ * For a shared or frozen result. The copy is memoised on the input so a
+ * component re-rendering with the same cache object keeps a stable reference.
  */
 export function encodeResult<T>(value: T, settings: EncodeSettings): T {
   if (!isWalkable(value)) return value;
@@ -104,7 +89,6 @@ function walk(
   return value;
 }
 
-/** An owner's serialized marker, built once and appended to every string it owns. */
 interface OwnerMarker {
   stamp: Stamp;
   marker: string;
@@ -127,8 +111,6 @@ function walkObject(
     state.seen.add(node);
   }
 
-  // A nested object with its own id owns its strings; otherwise the strings
-  // still belong to the nearest ancestor that had one.
   const fields = readFields(node, state.read);
   let current = owner;
   if (fields !== null) {
@@ -146,11 +128,16 @@ function walkObject(
     const value = node[key];
     if (typeof value === 'string') {
       let next = value;
-      if (current !== null && current.marker !== '' && !opaque && !shouldSkipKey(key, state.skip) && !shouldSkipValue(value)) {
+      if (
+        current !== null &&
+        current.marker !== '' &&
+        !opaque &&
+        !shouldSkipKey(key, state.skip) &&
+        !shouldSkipValue(value)
+      ) {
         next = value + current.marker;
       }
       if (next !== value && !state.copy) {
-        // A frozen result cannot be marked in place; `encodeResult` copies.
         frozen ??= Object.isFrozen(node);
         if (frozen) continue;
       }
@@ -190,8 +177,6 @@ function walkArray(
   const target = state.copy ? new Array<unknown>(node.length) : node;
   if (state.copy) copies.set(node, target);
 
-  // Allocated on the first item that turns out to own strings, so arrays of
-  // plain values never burn a reference.
   const box: { ref: string | null } = { ref: null };
   let frozen: boolean | undefined;
 
@@ -199,7 +184,6 @@ function walkArray(
     const value = node[i];
 
     if (typeof value === 'string') {
-      // An array of strings belongs to whoever owns the array's key.
       let next = value;
       if (owner !== null && owner.marker !== '' && !opaque && !shouldSkipValue(value)) {
         next = value + owner.marker;
@@ -224,10 +208,6 @@ function walkArray(
   return target;
 }
 
-/**
- * The read-key values this object carries, or `null` if it carries none — in
- * which case it is not an owner and its strings belong further up.
- */
 function readFields(node: Record<string, unknown>, read: string[]): Record<string, string> | null {
   let fields: Record<string, string> | null = null;
   for (let i = 0; i < read.length; i++) {

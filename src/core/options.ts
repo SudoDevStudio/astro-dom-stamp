@@ -23,10 +23,6 @@ export interface AstroDomStampOptions {
   devWarnings?: boolean;
 }
 
-/**
- * Keys whose values feed logic, URLs or styling rather than visible prose.
- * Same categories Sanity's stega client refuses by default.
- */
 export const DEFAULT_SKIP_FIELDS = [
   'class',
   'classname',
@@ -45,7 +41,6 @@ export const DEFAULT_EXCLUDE = ['**/node_modules/**'] as const;
 
 export interface ResolvedOptions {
   read: string[];
-  /** read key -> attribute name, precomputed. */
   attributes: Record<string, string>;
   enabled: boolean;
   sources: string[];
@@ -74,8 +69,7 @@ export function resolveOptions(options: AstroDomStampOptions): ResolvedOptions {
 
   const skipFields = new Set<string>(DEFAULT_SKIP_FIELDS);
   for (const key of options.skipFields ?? []) skipFields.add(key.toLowerCase());
-  // A read key's own value is an identifier: it ends up in URLs and comparisons,
-  // so it is never a place to hide a marker.
+  // Read-key values end up in URLs and comparisons, never in prose.
   for (const key of read) skipFields.add(key.toLowerCase());
 
   const attributes: Record<string, string> = {};

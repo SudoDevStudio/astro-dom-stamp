@@ -3,22 +3,17 @@ import { parseStamp } from './payload.js';
 import type { Stamp } from './types.js';
 
 /**
- * Strips our markers out of a value, deeply. Use it before anything that
- * inspects a string rather than displays it: `===` comparisons, `slice`,
- * `.length`, object lookups, building a URL, or parsing a date.
- *
- * Another CMS's stega is left alone — this removes our markers only.
+ * Strips our markers deeply. Use before anything that inspects a string rather
+ * than displays it: comparisons, `slice`, `.length`, URLs, date parsing.
  */
 export function clean<T>(value: T): T {
   return cleanValue(value, new WeakMap()) as T;
 }
 
-/** The single-string form, for hot paths where you know the shape. */
 export function cleanString(value: string): string {
   return hasMarker(value) ? stripMarkers(value) : value;
 }
 
-/** Every stamp carried by a string, in order. */
 export function decodeStamps(value: string): Stamp[] {
   const stamps: Stamp[] = [];
   for (const marker of findMarkers(value)) {

@@ -4,13 +4,11 @@ import { resolveOptions, type AstroDomStampOptions } from '../../src/core/option
 
 const READ = ['id', 'uid', 'sku'];
 
-/** Encodes data the way the server would, for interpolation into markup. */
 export function server<T>(data: T, read: string[] = READ): T {
   const resolved = resolveOptions({ read });
   return encode(data, { read: resolved.read, skipFields: resolved.skipFields });
 }
 
-/** Renders markup and runs one full scan, as the browser script would. */
 export function stamp(html: string, options: Partial<AstroDomStampOptions> = {}): void {
   document.body.innerHTML = html;
   const resolved = resolveOptions({ read: READ, devWarnings: false, ...options });
@@ -22,7 +20,6 @@ export function stamp(html: string, options: Partial<AstroDomStampOptions> = {})
   createStamper(config).scan();
 }
 
-/** The element carrying `data-id="<value>"`, for readable assertions. */
 export function stamped(value: string): Element | null {
   return document.querySelector(`[data-id="${value}"]`);
 }

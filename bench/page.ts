@@ -1,6 +1,5 @@
 import type { Product } from './fixture.ts';
 
-/** Markup shaped like a real listing page: a grid of cards with nested variants. */
 export function renderPage(products: Product[], withBody = false): string {
   let cards = '';
   for (const product of products) {

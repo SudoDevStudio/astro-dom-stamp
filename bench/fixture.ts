@@ -1,9 +1,3 @@
-/**
- * A CMS-shaped response big enough to match the kickoff's reference point of
- * roughly 9000 objects, so the numbers here line up with the ~2 ms figure
- * measured for a bare marking pass during design.
- */
-
 export interface Variant {
   id: string;
   sku: string;
@@ -64,7 +58,6 @@ export function makeProducts(count: number): Product[] {
   return products;
 }
 
-/** Objects and arrays the encoder has to walk, for reporting alongside timings. */
 export function countNodes(value: unknown, seen = new WeakSet<object>()): number {
   if (value === null || typeof value !== 'object') return 0;
   if (seen.has(value)) return 0;
@@ -88,5 +81,4 @@ export function countStrings(value: unknown, seen = new WeakSet<object>()): numb
   return total;
 }
 
-/** ~9000 objects, matching the response size the design was sized against. */
 export const REFERENCE_PRODUCT_COUNT = 1000;
