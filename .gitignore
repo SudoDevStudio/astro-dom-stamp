@@ -141,3 +141,12 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+kickoff.md
+# Probe build output
+probe/**/dist/
+probe/**/.astro/
+probe/**/probe-result.json
+
+# Build output
+dist/
