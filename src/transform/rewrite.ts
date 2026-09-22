@@ -6,17 +6,24 @@ import {
   RUNTIME_IMPORT,
   VIRTUAL_RUNTIME,
 } from './names.js';
+import { mightMatch, type SourceMatcher } from './sources.js';
+
+export { mightMatch } from './sources.js';
 
 export interface RewriteOptions {
   /** Extra call expressions to treat as data sources, e.g. `client.query`. */
-  sources?: string[];
+  sources?: SourceMatcher[];
 }
+
+/** Which rule matched, counted so a build can report coverage. */
+export const JSON_RULE = '.json()';
 
 export interface RewriteResult {
   code: string;
   map: ReturnType<MagicString['generateMap']>;
-  /** Call sites wrapped, for tests and for the plugin's debug logging. */
   wrapped: number;
+  /** Rule name -> how many call sites it wrapped in this file. */
+  matched: Record<string, number>;
 }
 
 interface Node {
@@ -44,15 +51,6 @@ export function langFor(id: string): 'js' | 'jsx' | 'ts' | 'tsx' | null {
   return extension ? (LANGS[extension] ?? null) : null;
 }
 
-/** Cheap pre-test so most files never reach the parser. */
-export function mightMatch(code: string, sources: string[] = []): boolean {
-  if (code.includes('.json(')) return true;
-  for (const source of sources) {
-    if (code.includes(lastSegment(source))) return true;
-  }
-  return false;
-}
-
 export function rewrite(id: string, code: string, options: RewriteOptions = {}): RewriteResult | null {
   const sources = options.sources ?? [];
   if (!mightMatch(code, sources)) return null;
@@ -64,7 +62,7 @@ export function rewrite(id: string, code: string, options: RewriteOptions = {}):
   const parsed = parseSync(id, code, { sourceType: 'module', lang, range: false });
   if (parsed.errors.length > 0) return null;
 
-  const targets: Array<{ node: Node; wrapper: Wrapper }> = [];
+  const targets: Array<{ node: Node; wrapper: Wrapper; rule: string }> = [];
   const alreadyWrapped = new Set<Node>();
 
   walk(parsed.program as unknown as Node, (node) => {
@@ -79,11 +77,15 @@ export function rewrite(id: string, code: string, options: RewriteOptions = {}):
     }
 
     if (isJsonCall(call)) {
-      targets.push({ node, wrapper: ENCODE_LOCAL });
+      targets.push({ node, wrapper: ENCODE_LOCAL, rule: JSON_RULE });
       return;
     }
-    if (calleeName !== null && matchesSource(calleeName, sources)) {
-      targets.push({ node, wrapper: ENCODE_RESULT_LOCAL });
+    if (calleeName === null) return;
+    for (const source of sources) {
+      if (source.test(calleeName)) {
+        targets.push({ node, wrapper: ENCODE_RESULT_LOCAL, rule: source.pattern });
+        return;
+      }
     }
   });
 
@@ -91,9 +93,11 @@ export function rewrite(id: string, code: string, options: RewriteOptions = {}):
   if (pending.length === 0) return null;
 
   const magic = new MagicString(code);
-  for (const { node, wrapper } of pending) {
+  const matched: Record<string, number> = {};
+  for (const { node, wrapper, rule } of pending) {
     magic.appendLeft(node.start, `${wrapper}(`);
     magic.appendRight(node.end, ')');
+    matched[rule] = (matched[rule] ?? 0) + 1;
   }
   magic.prepend(RUNTIME_IMPORT);
 
@@ -101,6 +105,7 @@ export function rewrite(id: string, code: string, options: RewriteOptions = {}):
     code: magic.toString(),
     map: magic.generateMap({ source: id, includeContent: true, hires: true }),
     wrapped: pending.length,
+    matched,
   };
 }
 
@@ -113,17 +118,6 @@ function isJsonCall(call: Node & { callee: Node; arguments: Node[] }): boolean {
   return property?.type === 'Identifier' && property.name === 'json';
 }
 
-/**
- * A source is matched on its full dotted path or on its tail, so `client.query`
- * in the config also covers `this.client.query` and `deps.client.query`.
- */
-function matchesSource(name: string, sources: string[]): boolean {
-  for (const source of sources) {
-    if (name === source || name.endsWith(`.${source}`)) return true;
-  }
-  return false;
-}
-
 function dottedName(node: Node): string | null {
   if (node.type === 'Identifier') return node.name as string;
   if (node.type === 'ThisExpression') return 'this';
@@ -132,11 +126,6 @@ function dottedName(node: Node): string | null {
   if (property.type !== 'Identifier') return null;
   const object = dottedName(node.object as Node);
   return object === null ? null : `${object}.${property.name as string}`;
-}
-
-function lastSegment(source: string): string {
-  const at = source.lastIndexOf('.');
-  return at === -1 ? source : source.slice(at + 1);
 }
 
 function walk(node: Node, visit: (node: Node) => void): void {

@@ -9,6 +9,7 @@ export default defineConfig({
     astroDomStamp({
       read: ['id', 'uid', 'sku'],
       enabled: process.env.ASTRO_DOM_STAMP_EDIT === 'true',
+      sources: ['http.get'],
     }),
   ],
 });

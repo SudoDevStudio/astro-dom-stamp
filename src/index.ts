@@ -1,6 +1,6 @@
 import type { AstroIntegration } from 'astro';
 import { resolveOptions, type AstroDomStampOptions, type ResolvedOptions } from './core/options.js';
-import { createTransformPlugin } from './transform/plugin.js';
+import { createStats, createTransformPlugin, reportCoverage } from './transform/plugin.js';
 
 export type { AstroDomStampOptions, ResolvedOptions } from './core/options.js';
 export type { ListRef, Stamp } from './core/types.js';
@@ -22,6 +22,9 @@ export default function astroDomStamp(options: AstroDomStampOptions): AstroInteg
     return { name: NAME, hooks: {} };
   }
 
+  // Shared across the several Vite builds one `astro build` runs.
+  const stats = createStats(resolved.sources);
+
   return {
     name: NAME,
     hooks: {
@@ -29,11 +32,12 @@ export default function astroDomStamp(options: AstroDomStampOptions): AstroInteg
         logger.info('edit mode on: markers and the browser stamper are in this build.');
         updateConfig({
           vite: {
-            plugins: [createTransformPlugin(resolved), runtimeModulePlugin(options, resolved)],
+            plugins: [createTransformPlugin(resolved, stats), runtimeModulePlugin(options, resolved)],
           },
         });
         injectScript('page', stamperEntry(resolved));
       },
+      'astro:build:done': ({ logger }) => reportCoverage(stats, logger),
     },
   };
 }

@@ -90,10 +90,37 @@ astroDomStamp({
 ```
 
 Those are wrapped with `__encodeResult`, which copies rather than marking in
-place, because a GraphQL cache entry or a hook result may be shared or frozen.
-A dotted name also matches by its tail, so `client.query` covers
-`this.client.query`. Files are matched by `include` / `exclude`, and a file with
-no fetch point is never parsed.
+place, because a cache entry or a hook result may be shared or frozen.
+
+A dotted name matches by its tail, so `client.query` also covers
+`this.client.query`. `*` stands for one path segment, which is how an in-house
+naming convention gets covered without listing every call:
+
+| Pattern | Matches | Does not match |
+| --- | --- | --- |
+| `client.*` | `client.query`, `client.fetchAll` | `client.a.b` |
+| `use*Query` | `useProductsQuery` | `useProductsQueryX` |
+| `api.get*` | `api.getProducts` | `api.setProducts` |
+| `*.query` | `anything.query` | `query` |
+
+Files are matched by `include` / `exclude`, and a file with no fetch point is
+never parsed.
+
+### Finding out what to configure
+
+An edit build reports what it wrapped, so you do not have to guess:
+
+```
+[astro-dom-stamp] wrapped 143 data sources in 88 file(s)
+[astro-dom-stamp]   .json()  141
+[astro-dom-stamp]   client.*  2
+[WARN] [astro-dom-stamp] `sources` entry "http.get" matched no call in this build.
+```
+
+A `sources` entry that matched nothing is almost always a typo or a name that
+does not exist in your codebase. If nothing at all was wrapped, your data does
+not reach the page through `fetch`, and you need to name the call it does come
+from.
 
 If you need to encode something the transform cannot reach, do it yourself:
 
@@ -142,7 +169,7 @@ left exactly where it was.
 | --- | --- | --- | --- |
 | `read` | `string[]` | **required** | Keys that become attributes. `id` → `data-id`, `productId` → `data-product-id`. |
 | `enabled` | `boolean` | `false` | `true` for the edit build. `false` registers nothing at all. |
-| `sources` | `string[]` | `[]` | Extra call expressions to wrap, e.g. `client.query`, `useQuery`. |
+| `sources` | `string[]` | `[]` | Extra call expressions to wrap, e.g. `client.query`, `useQuery`, `api.*`. `*` matches one path segment. |
 | `skipFields` | `string[]` | see below | Extra keys whose values are never marked. |
 | `include` | `string[]` | `src/**/*.{astro,ts,js,mjs,tsx,jsx}` | Files the transform covers. A project-relative glob is anchored for you, since Vite passes absolute ids. |
 | `exclude` | `string[]` | `**/node_modules/**` | Files it skips. |

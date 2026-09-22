@@ -76,3 +76,49 @@ describe('edit build', () => {
     expect(code).toContain('createEncoder');
   });
 });
+
+describe('build report', () => {
+  function runBuild(sources: string[], files: Array<[string, string]>) {
+    const { args, configs } = setupArgs();
+    const integration = astroDomStamp({ read: ['id'], enabled: true, sources });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (integration.hooks['astro:config:setup'] as any)(args);
+    const plugin = (
+      configs[0] as {
+        vite: {
+          plugins: Array<{ name: string; transform: { handler(code: string, id: string): unknown } }>;
+        };
+      }
+    ).vite.plugins.find((p) => p.name === 'astro-dom-stamp:transform')!;
+    for (const [id, code] of files) plugin.transform.handler(code, id);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (integration.hooks['astro:build:done'] as any)(args);
+    return args.logger;
+  }
+
+  it('counts what each rule wrapped', () => {
+    const logger = runBuild(
+      ['client.*'],
+      [
+        ['/p/src/lib/a.ts', 'const a = await res.json();'],
+        ['/p/src/lib/b.ts', 'const b = await client.query(Q);'],
+      ],
+    );
+    const lines = logger.info.mock.calls.map((c) => String(c[0]));
+    expect(lines).toContain('wrapped 2 data sources in 2 file(s)');
+    expect(lines.some((l) => l.includes('.json()  1'))).toBe(true);
+    expect(lines.some((l) => l.includes('client.*  1'))).toBe(true);
+  });
+
+  it('warns about a configured source that matched nothing', () => {
+    const logger = runBuild(['http.get'], [['/p/src/lib/a.ts', 'const a = await res.json();']]);
+    const warnings = logger.warn.mock.calls.map((c) => String(c[0]));
+    expect(warnings.some((w) => w.includes('"http.get" matched no call'))).toBe(true);
+  });
+
+  it('warns when nothing at all came from fetch', () => {
+    const logger = runBuild(['client.*'], [['/p/src/lib/a.ts', 'const b = await client.query(Q);']]);
+    const warnings = logger.warn.mock.calls.map((c) => String(c[0]));
+    expect(warnings.some((w) => w.includes('no `.json()` call was wrapped'))).toBe(true);
+  });
+});

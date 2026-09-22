@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { langFor, mightMatch, rewrite } from '../src/transform/rewrite.ts';
+import { langFor, rewrite } from '../src/transform/rewrite.ts';
+import { compileSources, mightMatch } from '../src/transform/sources.ts';
 import { ENCODE_LOCAL, ENCODE_RESULT_LOCAL, VIRTUAL_RUNTIME } from '../src/transform/names.ts';
 
 function body(id: string, code: string, sources: string[] = []): string | null {
-  const result = rewrite(id, code, { sources });
+  const result = rewrite(id, code, { sources: compileSources(sources) });
   if (!result) return null;
   return result.code.split('\n').slice(1).join('\n').trim();
 }
@@ -71,11 +72,11 @@ describe('configured sources', () => {
   });
 
   it('ignores a source that is not configured', () => {
-    expect(rewrite('a.ts', 'const d = useQuery(Q);', { sources: [] })).toBeNull();
+    expect(rewrite('a.ts', 'const d = useQuery(Q);', { sources: compileSources([]) })).toBeNull();
   });
 
   it('does not match a bare name against a dotted call', () => {
-    expect(rewrite('a.ts', 'const d = a.useQueryX(Q);', { sources: ['useQuery'] })).toBeNull();
+    expect(rewrite('a.ts', 'const d = a.useQueryX(Q);', { sources: compileSources(['useQuery']) })).toBeNull();
   });
 });
 
@@ -142,9 +143,51 @@ describe('file selection', () => {
   });
 
   it('pre-tests without parsing', () => {
-    expect(mightMatch('const x = 1;')).toBe(false);
-    expect(mightMatch('await res.json()')).toBe(true);
-    expect(mightMatch('useQuery(Q)', ['useQuery'])).toBe(true);
-    expect(mightMatch('client.query(Q)', ['client.query'])).toBe(true);
+    expect(mightMatch('const x = 1;', [])).toBe(false);
+    expect(mightMatch('await res.json()', [])).toBe(true);
+    expect(mightMatch('useQuery(Q)', compileSources(['useQuery']))).toBe(true);
+    expect(mightMatch('client.query(Q)', compileSources(['client.query']))).toBe(true);
+  });
+});
+
+describe('wildcard sources', () => {
+  const wrapped = (code: string, sources: string[]) =>
+    rewrite('a.ts', code, { sources: compileSources(sources) })?.wrapped ?? 0;
+
+  it.each([
+    ['client.*', 'const d = await client.query(Q);'],
+    ['client.*', 'const d = await client.fetchAll(Q);'],
+    ['use*Query', 'const d = useProductsQuery(Q);'],
+    ['api.get*', 'const d = await api.getProducts();'],
+    ['*.query', 'const d = await anything.query(Q);'],
+  ])('pattern %s matches %s', (pattern, code) => {
+    expect(wrapped(code, [pattern])).toBe(1);
+  });
+
+  it.each([
+    ['client.*', 'const d = await client.a.b(Q);'],
+    ['use*Query', 'const d = useProductsQueryX(Q);'],
+    ['api.get*', 'const d = await api.setProducts();'],
+  ])('pattern %s does not match %s', (pattern, code) => {
+    expect(wrapped(code, [pattern])).toBe(0);
+  });
+
+  it('still matches a dotted pattern by its tail', () => {
+    expect(wrapped('const d = await this.deps.client.query(Q);', ['client.query'])).toBe(1);
+  });
+
+  it('reports which rule wrapped what', () => {
+    const result = rewrite(
+      'a.ts',
+      'const a = await res.json();\nconst b = await client.query(Q);',
+      { sources: compileSources(['client.*']) },
+    )!;
+    expect(result.matched).toEqual({ '.json()': 1, 'client.*': 1 });
+  });
+
+  it('pre-tests a wildcard pattern by its longest literal run', () => {
+    expect(mightMatch('useProductsQuery(Q)', compileSources(['use*Query']))).toBe(true);
+    expect(mightMatch('somethingElse(Q)', compileSources(['use*Query']))).toBe(false);
+    expect(mightMatch('http.get(u)', compileSources(['http.*']))).toBe(true);
   });
 });
