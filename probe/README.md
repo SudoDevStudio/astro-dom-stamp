@@ -78,3 +78,42 @@ once markers and the injected script are removed.
    through `createEncoder`, so `__encode(res.json())` was handed a promise and
    returned it untouched. Both the unit tests and the transform were correct in
    isolation; only running them together showed it.
+
+## `react` — does it survive React hydration in a real browser?
+
+**Question (kickoff, Phase 1 item 4 and Phase 3):** do markers reach hydrated
+islands through serialized props, does stamping before or after hydration upset
+React, and does a `client:only` island that fetches in the browser get stamped?
+
+jsdom cannot answer this: it does not execute module scripts, so the island
+bundles never run. This probe drives a real headless Chromium through
+Playwright.
+
+The page renders the same two products three ways — server-rendered in the
+`.astro` template, passed as props to a `client:load` React island, and fetched
+in the browser by a `client:only` island from an SSR endpoint.
+
+```sh
+npm run build && node probe/react/check.mjs
+```
+
+**Result — Astro 7.3.3, @astrojs/react 7.0.0, React 19.3.0, Chromium 153:** all
+twelve checks pass. Every rendering gets its attributes, `client:only` content
+is stamped after its own fetch, React logs no hydration warning or mismatch, and
+the production build stamps nothing.
+
+**Two bugs this caught:**
+
+1. **Repeated renderings collapsed into one group.** The server list and the
+   island come from the same `loadProducts()` call, so their markers are
+   byte-identical. Every occurrence landed in one group whose common ancestor
+   was `<body>`, which is not stampable — so the entity got no attribute at all,
+   silently. `resolvePlacements` now splits a group by branch when its common
+   ancestor cannot be stamped.
+2. **A page without a declared UTF-8 charset destroys every marker.** The probe
+   page had no `<head>`, the Node adapter sent `Content-Type: text/html` with no
+   charset, and Chromium fell back to windows-1252. Each U+FEFF became `ï»¿`
+   before any of our code ran. A separate experiment confirmed Chromium
+   preserves all four alphabet characters correctly once the charset is right.
+   The stamper now warns when `document.characterSet` is not UTF-8, since
+   nothing downstream can recover from it.

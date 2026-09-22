@@ -52,15 +52,53 @@ export function resolvePlacements(occurrences: Occurrence[]): Placement[] {
 
   const placements: Placement[] = [];
   for (const group of groups.values()) {
-    const anchor = lowestCommonAncestor(group.elements);
-    if (!anchor) continue;
     const list = group.stamp.list;
     const owners = list ? ownership.get(list.ref) : undefined;
-    const target = owners ? climbToItemRoot(anchor, owners, list!.index) : anchor;
-    if (!isStampable(target)) continue;
-    placements.push({ target, stamp: group.stamp, key: group.key });
+    for (const cluster of splitRenderings(group.elements)) {
+      const anchor = lowestCommonAncestor(cluster);
+      if (!anchor || !isStampable(anchor)) continue;
+      const target = owners ? climbToItemRoot(anchor, owners, list!.index) : anchor;
+      if (!isStampable(target)) continue;
+      placements.push({ target, stamp: group.stamp, key: group.key });
+    }
   }
   return placements;
+}
+
+/**
+ * One entity can be rendered more than once on a page — an Astro page that
+ * renders a list server-side and also passes it to an island produces markers
+ * that are byte-identical, so every copy lands in one group. Taken together
+ * their common ancestor is `<body>`, which is not stampable, and the entity
+ * would get no attribute at all.
+ *
+ * When that happens, split the occurrences by which branch of that ancestor
+ * they sit under and treat each branch as its own rendering.
+ */
+function splitRenderings(elements: Element[]): Element[][] {
+  const anchor = lowestCommonAncestor(elements);
+  if (!anchor) return [];
+  if (isStampable(anchor)) return [elements];
+
+  const branches = new Map<Element, Element[]>();
+  for (const element of elements) {
+    const branch = branchOf(anchor, element);
+    if (!branch) continue;
+    const existing = branches.get(branch);
+    if (existing) existing.push(element);
+    else branches.set(branch, [element]);
+  }
+
+  const clusters: Element[][] = [];
+  for (const branch of branches.values()) clusters.push(...splitRenderings(branch));
+  return clusters;
+}
+
+/** The child of `ancestor` that `descendant` sits under, or null if it is the ancestor. */
+function branchOf(ancestor: Element, descendant: Element): Element | null {
+  let node: Element | null = descendant;
+  while (node && node.parentElement !== ancestor) node = node.parentElement;
+  return node;
 }
 
 /**

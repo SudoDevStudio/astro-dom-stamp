@@ -98,3 +98,21 @@ describe('dev warnings', () => {
     expect(warnings.some((args) => String(args[0]).includes('skipFields'))).toBe(true);
   });
 });
+
+describe('charset', () => {
+  it('warns when the page is not decoded as UTF-8', async () => {
+    const warnings: string[] = [];
+    const original = console.warn;
+    const describe_ = Object.getOwnPropertyDescriptor(Document.prototype, 'characterSet');
+    Object.defineProperty(document, 'characterSet', { value: 'windows-1252', configurable: true });
+    console.warn = (...args: unknown[]) => warnings.push(String(args[0]));
+    try {
+      start({ devWarnings: true });
+      await settle();
+    } finally {
+      console.warn = original;
+      if (describe_) Object.defineProperty(document, 'characterSet', describe_);
+    }
+    expect(warnings.some((w) => w.includes('not UTF-8'))).toBe(true);
+  });
+});

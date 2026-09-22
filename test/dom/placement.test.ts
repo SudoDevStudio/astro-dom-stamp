@@ -170,3 +170,54 @@ describe('scanning', () => {
     expect(document.querySelector('h1')!.textContent!.replace(/[​-‍﻿]/gu, '')).toBe('Shoe');
   });
 });
+
+describe('one entity rendered more than once', () => {
+  it('stamps each rendering separately instead of giving up at body', () => {
+    const p = server({ id: 'p1', title: 'Shoe', blurb: 'Soft' });
+    stamp(
+      `<section class="hero"><h1>${p.title}</h1><p>${p.blurb}</p></section>` +
+        `<aside class="rail"><h3>${p.title}</h3><p>${p.blurb}</p></aside>`,
+    );
+    const stampedElements = [...document.querySelectorAll('[data-id="p1"]')];
+    expect(stampedElements.map(describeElement)).toEqual(['section.hero', 'aside.rail']);
+  });
+
+  it('still stamps a list rendered twice on one page', () => {
+    const products = server([
+      { id: 'p1', title: 'Shoe', blurb: 'Soft' },
+      { id: 'p2', title: 'Boot', blurb: 'Warm' },
+    ]);
+    const list = (cls: string) =>
+      `<ul class="${cls}">` +
+      products
+        .map((p) => `<li class="${cls}-card"><h3>${p.title}</h3><p>${p.blurb}</p></li>`)
+        .join('') +
+      '</ul>';
+    stamp(list('server') + list('island'));
+    expect([...document.querySelectorAll('[data-id="p1"]')].map(describeElement)).toEqual([
+      'li.server-card',
+      'li.island-card',
+    ]);
+    expect(document.querySelectorAll('[data-id]')).toHaveLength(4);
+  });
+
+  it('leaves a single rendering with a nested entity alone', () => {
+    const products = server([
+      { id: 'p1', title: 'Shoe', blurb: 'Soft', variants: [{ id: 'v1', label: 'Red' }] },
+      { id: 'p2', title: 'Boot', blurb: 'Warm', variants: [{ id: 'v2', label: 'Blue' }] },
+    ]);
+    stamp(
+      `<div class="grid">` +
+        products
+          .map(
+            (p) =>
+              `<article class="card"><h3>${p.title}</h3><p>${p.blurb}</p>` +
+              `<ul><li class="v">${p.variants[0]!.label}</li></ul></article>`,
+          )
+          .join('') +
+        `</div>`,
+    );
+    expect(describeElement(stamped('p1'))).toBe('article.card');
+    expect(describeElement(stamped('v1'))).toBe('li.v');
+  });
+});

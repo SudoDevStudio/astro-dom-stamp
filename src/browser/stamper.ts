@@ -92,6 +92,7 @@ export function createStamper(config: StamperConfig): Stamper {
 
   function start(): void {
     if (observer) return;
+    if (config.devWarnings) warnAboutCharset(warnedKeys);
     observer = new MutationObserver((records) => {
       if (applying) return;
       for (const record of records) {
@@ -186,6 +187,21 @@ function reportUnsafe(element: Element, name: string, warnedKeys: Set<string>): 
     console.warn(
       `${LOG_PREFIX} a marker reached the "${name}" attribute. The CMS field behind it is used as data, not prose — add its key to \`skipFields\`.`,
       element,
+    ),
+  );
+}
+
+/**
+ * A page served without a declared UTF-8 charset is decoded as windows-1252,
+ * which turns every marker into mojibake before any of this code runs. Nothing
+ * here can recover from it, so say so plainly.
+ */
+function warnAboutCharset(warnedKeys: Set<string>): void {
+  if (document.characterSet === 'UTF-8') return;
+  warnOnce(warnedKeys, 'charset', () =>
+    console.warn(
+      `${LOG_PREFIX} this page is being decoded as ${document.characterSet}, not UTF-8, so every marker is corrupted. ` +
+        'Add <meta charset="utf-8"> to the document head, or send a charset in the Content-Type header.',
     ),
   );
 }

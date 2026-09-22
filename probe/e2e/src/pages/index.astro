@@ -3,6 +3,7 @@ import { loadProducts } from '../lib/data.ts';
 const products = await loadProducts();
 ---
 <html lang="en">
+  <head><meta charset="utf-8" /><title>E2E probe</title></head>
   <body>
     <ul class="grid">
       {products.map((p) => (

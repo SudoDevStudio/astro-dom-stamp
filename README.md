@@ -9,10 +9,10 @@ production.
 npm install @sudodevstudio/astro-dom-stamp
 ```
 
-> **Status: Phase 2.** The build-time transform, the encoder, the browser
-> stamper and `clean()` are built, tested and verified end to end through a real
-> Astro SSR build. React-specific work (browser-side fetch, hooks) is Phase 3.
-> See [Roadmap](#roadmap).
+> **Status: Phase 3.** Built, tested, and verified end to end through a real
+> Astro SSR build and a real headless browser: server rendering, `client:load`
+> hydration, and `client:only` islands that fetch in the browser. Vue and
+> Svelte are not covered yet. See [Roadmap](#roadmap).
 
 ## How it works
 
@@ -188,6 +188,15 @@ with 500 marked strings costs roughly 6 KB gzipped.
 Browser numbers come from jsdom, which is slower than a real engine, so treat
 them as an upper bound. Scan time grows linearly with element count.
 
+## Requirements
+
+**The page must declare UTF-8.** Markers are zero-width characters; a page
+decoded as windows-1252 turns every one of them into mojibake before any of this
+code runs, and nothing downstream can recover. Any normal Astro page already has
+`<meta charset="utf-8">` in its head — but if yours does not, or your server
+sends `Content-Type: text/html` with no charset, edit mode silently stamps
+nothing. The browser console says so when `devWarnings` is on.
+
 ## Limitations
 
 - **Strings only.** An item rendered purely as a number or an image with no
@@ -205,6 +214,9 @@ them as an upper bound. Scan time grows linearly with element count.
 - **Another CMS's stega.** Markers coexist: ours uses a different prefix, and
   each decoder skips the other. Still simpler to turn the CMS's own stega off
   when you have your own editor.
+- **One entity rendered many times.** Each rendering is stamped separately, but
+  only when their occurrences sit in different branches of the page. Two
+  renderings inside one small shared container still resolve to that container.
 - **Vue and Svelte** are not covered yet.
 
 ## Roadmap
@@ -213,7 +225,8 @@ them as an upper bound. Scan time grows linearly with element count.
    order, Gurmukhi and emoji rendering, and gzipped HTML size all verified.
 2. ✅ **Phase 2** — build-time transform for `.astro` and `.ts/.js` helpers,
    verified end to end against a real Astro SSR build.
-3. **Phase 3** — React: `.tsx/.jsx`, browser-side fetch, hooks named in `sources`.
+3. ✅ **Phase 3** — React: `.tsx/.jsx`, browser-side fetch, hydrated islands,
+   `client:only`, all verified in a real headless browser.
 4. **Phase 4** — preview deployment against real pages.
 5. **Phase 5** — Vue and Svelte.
 

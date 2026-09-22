@@ -230,3 +230,19 @@ describe('createEncoder', () => {
     expect(encoder.__encode('plain')).toBe('plain');
   });
 });
+
+describe('data encoded twice', () => {
+  it('does not stack markers when a marked response is fetched again', () => {
+    const onServer = encode([{ id: 'p1', sku: 'AB-1', title: 'Shoe' }], defaultSettings);
+    const overTheWire = JSON.parse(JSON.stringify(onServer)) as typeof onServer;
+    const inBrowser = encode(overTheWire, defaultSettings);
+    expect(decodeStamps(inBrowser[0]!.title)).toHaveLength(1);
+    expect(inBrowser[0]!.title).toBe(onServer[0]!.title);
+  });
+
+  it('still marks a string that carries a different entity marker', () => {
+    const a = encode({ id: 'a1', title: 'One' }, defaultSettings);
+    const combined = encode({ id: 'b1', title: a.title }, defaultSettings);
+    expect(decodeStamps(combined.title)).toHaveLength(2);
+  });
+});

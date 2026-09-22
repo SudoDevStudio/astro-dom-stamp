@@ -1,5 +1,6 @@
-import { encodeMarker } from './marker.js';
-import { serializeStamp } from './payload.js';
+import { isAlphabetChar } from './alphabet.js';
+import { encodeMarker, findLastMarker } from './marker.js';
+import { parseStamp, serializeStamp } from './payload.js';
 import { isOpaqueParent, shouldSkipKey, shouldSkipValue } from './skip.js';
 import type { Stamp } from './types.js';
 
@@ -18,6 +19,9 @@ function nextListRef(): string {
   return (listRefCounter++).toString(36);
 }
 
+// Identity-based, so it only catches a result handed to encode() twice. A
+// result that crossed the wire and was parsed again is a different graph, which
+// is why each string is also checked for the marker it is about to receive.
 const encodedInPlace = new WeakSet<object>();
 const copies = new WeakMap<object, unknown>();
 
@@ -133,7 +137,8 @@ function walkObject(
         current.marker !== '' &&
         !opaque &&
         !shouldSkipKey(key, state.skip) &&
-        !shouldSkipValue(value)
+        !shouldSkipValue(value) &&
+        !alreadyOwned(value, current)
       ) {
         next = value + current.marker;
       }
@@ -185,7 +190,13 @@ function walkArray(
 
     if (typeof value === 'string') {
       let next = value;
-      if (owner !== null && owner.marker !== '' && !opaque && !shouldSkipValue(value)) {
+      if (
+        owner !== null &&
+        owner.marker !== '' &&
+        !opaque &&
+        !shouldSkipValue(value) &&
+        !alreadyOwned(value, owner)
+      ) {
         next = value + owner.marker;
       }
       if (next !== value && !state.copy) {
@@ -206,6 +217,34 @@ function walkArray(
   }
 
   return target;
+}
+
+/**
+ * A response that was encoded on the server, sent over the wire and parsed
+ * again is a fresh object graph, so the identity guard cannot see it. Compare
+ * the trailing marker's fields instead — not the whole marker, because the list
+ * reference is allocated per encode run and would differ every time.
+ *
+ * The last character of a marker is always from our alphabet, so an unmarked
+ * string costs one lookup.
+ */
+function alreadyOwned(value: string, owner: OwnerMarker): boolean {
+  if (!isAlphabetChar(value.charCodeAt(value.length - 1))) return false;
+  if (value.endsWith(owner.marker)) return true;
+
+  const last = findLastMarker(value);
+  if (last === undefined) return false;
+  const stamp = parseStamp(last.payload);
+  if (stamp === null) return false;
+
+  const fields = owner.stamp.fields;
+  for (const key in fields) {
+    if (stamp.fields[key] !== fields[key]) return false;
+  }
+  for (const key in stamp.fields) {
+    if (fields[key] === undefined) return false;
+  }
+  return true;
 }
 
 function readFields(node: Record<string, unknown>, read: string[]): Record<string, string> | null {
