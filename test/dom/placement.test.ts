@@ -221,3 +221,71 @@ describe('one entity rendered more than once', () => {
     expect(describeElement(stamped('v1'))).toBe('li.v');
   });
 });
+
+describe('repeated renderings inside one container', () => {
+  it('splits two renderings that share a small ancestor', () => {
+    const p = server({ id: 'p1', title: 'Shoe', blurb: 'Soft' });
+    stamp(
+      `<main>` +
+        `<section class="a"><h1>${p.title}</h1><p>${p.blurb}</p></section>` +
+        `<section class="b"><h1>${p.title}</h1><p>${p.blurb}</p></section>` +
+        `</main>`,
+    );
+    expect([...document.querySelectorAll('[data-id="p1"]')].map(describeElement)).toEqual([
+      'section.a',
+      'section.b',
+    ]);
+    expect(document.querySelector('main')!.hasAttribute('data-id')).toBe(false);
+  });
+
+  it('keeps a single rendering whole when a nested entity shares its ancestor', () => {
+    const products = server([
+      { id: 'p1', title: 'Shoe', blurb: 'Soft', variants: [{ id: 'v1', label: 'Red' }] },
+      { id: 'p2', title: 'Boot', blurb: 'Warm', variants: [{ id: 'v2', label: 'Blue' }] },
+    ]);
+    stamp(
+      `<div class="grid">` +
+        products
+          .map(
+            (p) =>
+              `<article class="card"><h3>${p.title}</h3><p>${p.blurb}</p>` +
+              `<ul><li class="v">${p.variants[0]!.label}</li></ul></article>`,
+          )
+          .join('') +
+        `</div>`,
+    );
+    expect(describeElement(stamped('p1'))).toBe('article.card');
+    expect(document.querySelectorAll('[data-id="p1"]')).toHaveLength(1);
+  });
+
+  it('handles a rendering that shows only some of the fields', () => {
+    const p = server({ id: 'p1', title: 'Shoe', blurb: 'Soft' });
+    stamp(
+      `<main>` +
+        `<section class="full"><h1>${p.title}</h1><p>${p.blurb}</p></section>` +
+        `<section class="teaser"><h2>${p.title}</h2></section>` +
+        `</main>`,
+    );
+    expect([...document.querySelectorAll('[data-id="p1"]')].map(describeElement)).toEqual([
+      'section.full',
+      'h2',
+    ]);
+  });
+
+  it('splits three renderings of a list item', () => {
+    const products = server([
+      { id: 'p1', title: 'Shoe', blurb: 'Soft' },
+      { id: 'p2', title: 'Boot', blurb: 'Warm' },
+    ]);
+    const list = (cls: string) =>
+      `<ul class="${cls}">` +
+      products.map((p) => `<li class="${cls}-card"><h3>${p.title}</h3><p>${p.blurb}</p></li>`).join('') +
+      `</ul>`;
+    stamp(`<main>${list('a')}${list('b')}${list('c')}</main>`);
+    expect([...document.querySelectorAll('[data-id="p1"]')].map(describeElement)).toEqual([
+      'li.a-card',
+      'li.b-card',
+      'li.c-card',
+    ]);
+  });
+});

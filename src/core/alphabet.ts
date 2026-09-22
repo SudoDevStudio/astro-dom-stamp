@@ -52,5 +52,5 @@ export function charsToBytes(text: string, start: number, count: number): Uint8A
 }
 
 export function isAlphabetChar(code: number): boolean {
-  return VALUES[code] !== undefined;
+  return code === 0xfeff || (code >= 0x200b && code <= 0x200d);
 }

@@ -108,8 +108,9 @@ the production build stamps nothing.
    island come from the same `loadProducts()` call, so their markers are
    byte-identical. Every occurrence landed in one group whose common ancestor
    was `<body>`, which is not stampable — so the entity got no attribute at all,
-   silently. `resolvePlacements` now splits a group by branch when its common
-   ancestor cannot be stamped.
+   silently. Markers now carry the ordinal of the string they came from, so
+   `resolvePlacements` can tell renderings apart: a rendering shows each field
+   once, so an ordinal repeating means a new one started.
 2. **A page without a declared UTF-8 charset destroys every marker.** The probe
    page had no `<head>`, the Node adapter sent `Content-Type: text/html` with no
    charset, and Chromium fell back to windows-1252. Each U+FEFF became `ï»¿`

@@ -1,4 +1,4 @@
-import { LIST_KEY } from './payload.js';
+import { FIELD_KEY, LIST_KEY } from './payload.js';
 
 export interface AstroDomStampOptions {
   /**
@@ -60,9 +60,9 @@ export function resolveOptions(options: AstroDomStampOptions): ResolvedOptions {
     if (typeof key !== 'string' || key.length === 0) {
       throw new Error('[astro-dom-stamp] every entry of `read` must be a non-empty string.');
     }
-    if (key === LIST_KEY) {
+    if (key === LIST_KEY || key === FIELD_KEY) {
       throw new Error(
-        `[astro-dom-stamp] "${LIST_KEY}" is reserved for the list reference and cannot be a \`read\` key.`,
+        `[astro-dom-stamp] "${key}" is reserved by the marker payload and cannot be a \`read\` key.`,
       );
     }
   }

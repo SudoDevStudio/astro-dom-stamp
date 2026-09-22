@@ -65,3 +65,35 @@ describe('options', () => {
     expect(resolveOptions({ read: ['id'] }).enabled).toBe(false);
   });
 });
+
+describe('field ordinal', () => {
+  it('writes the ordinal last, in base 36', () => {
+    expect(serializeStamp({ fields: { id: '5' }, field: 41 })).toBe('v1|id=5|f=15');
+  });
+
+  it('round trips with a list reference', () => {
+    const stamp = { fields: { id: '5' }, list: { ref: 'a7', index: 2 }, field: 3 };
+    expect(parseStamp(serializeStamp(stamp))).toEqual(stamp);
+  });
+
+  it('keeps the entity key free of the ordinal, so fields group together', () => {
+    const a = { fields: { id: '5' }, field: 0 };
+    const b = { fields: { id: '5' }, field: 7 };
+    expect(stampKey(a)).toBe(stampKey(b));
+    expect(serializeStamp(a)).not.toBe(serializeStamp(b));
+  });
+
+  it('separates different entities', () => {
+    expect(stampKey({ fields: { id: '5' }, field: 0 })).not.toBe(
+      stampKey({ fields: { id: '6' }, field: 0 }),
+    );
+  });
+
+  it('reads a marker that carries no ordinal', () => {
+    expect(parseStamp('v1|id=5')).toEqual({ fields: { id: '5' } });
+  });
+
+  it('refuses the reserved ordinal key as a read key', () => {
+    expect(() => resolveOptions({ read: ['f'] })).toThrow(/reserved/);
+  });
+});

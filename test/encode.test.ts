@@ -246,3 +246,47 @@ describe('data encoded twice', () => {
     expect(decodeStamps(combined.title)).toHaveLength(2);
   });
 });
+
+describe('field ordinals', () => {
+  it('numbers each owner\'s strings from zero', () => {
+    const data = encode({ id: '5', title: 'Shoe', blurb: 'Soft' }, defaultSettings);
+    expect(stampOf(data.title)?.field).toBe(0);
+    expect(stampOf(data.blurb)?.field).toBe(1);
+  });
+
+  it('restarts numbering for a nested owner', () => {
+    const data = encode(
+      { id: 'p', title: 'Shoe', variant: { id: 'v', label: 'Red', note: 'New' } },
+      defaultSettings,
+    );
+    expect(stampOf(data.title)?.field).toBe(0);
+    expect(stampOf(data.variant.label)?.field).toBe(0);
+    expect(stampOf(data.variant.note)?.field).toBe(1);
+  });
+
+  it('numbers items of a string array', () => {
+    const data = encode({ id: '5', tags: ['Warm', 'Winter'] }, defaultSettings);
+    expect(stampOf(data.tags[0]!)?.field).toBe(0);
+    expect(stampOf(data.tags[1]!)?.field).toBe(1);
+  });
+
+  it('gives two items of one list the same ordinals', () => {
+    const data = encode(
+      [
+        { id: 'a', title: 'One', blurb: 'x' },
+        { id: 'b', title: 'Two', blurb: 'y' },
+      ],
+      defaultSettings,
+    );
+    expect(stampOf(data[0]!.title)?.field).toBe(stampOf(data[1]!.title)?.field);
+    expect(stampOf(data[0]!.blurb)?.field).toBe(1);
+  });
+
+  it('keeps ordinals stable when a response is encoded twice', () => {
+    const onServer = encode({ id: '5', title: 'Shoe', blurb: 'Soft' }, defaultSettings);
+    const overTheWire = JSON.parse(JSON.stringify(onServer)) as typeof onServer;
+    const inBrowser = encode(overTheWire, defaultSettings);
+    expect(inBrowser.title).toBe(onServer.title);
+    expect(inBrowser.blurb).toBe(onServer.blurb);
+  });
+});

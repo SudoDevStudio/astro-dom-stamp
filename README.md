@@ -109,6 +109,7 @@ const products = __encode(await db.products.findMany());
 | Case | Element | Example |
 | --- | --- | --- |
 | Single object | Smallest element wrapping all of its text | `div.product` in `<div class="product"><h1>Shoe</h1><p>Soft</p></div>` |
+| Same entity rendered twice | Each rendering gets its own attribute | a hero and a sidebar card both stamped |
 | List, 2+ items rendered | Highest element covering only that item — the `.map()` element | each `<li>` or each card |
 | List, 1 item rendered | No container to find, so the single-object rule applies | `<h3>` in `<ul><li><h3>Shoe</h3></li></ul>` |
 | Nested entities | Each level takes its own element | product gets `<article>`, each variant its own `<li>` |
@@ -175,9 +176,9 @@ Node 22.22 on an Apple Silicon laptop. Reproduce with `npm run bench`,
 | --- | --- | --- |
 | Production | nothing is included | 0 |
 | Build | **+6.9%** over 1000 modules that all contain a fetch point | < 10% |
-| Server | **~6 ms** to encode a 1000-product response (8001 objects, 32000 strings) | < 20 ms/request |
-| Browser | **~2.3 ms** first scan on a 806-element page; ~10.5 ms at 3206 elements | < 50 ms |
-| HTML | **~360 B raw per marker, ~12 B after gzip** | measure and decide |
+| Server | **~6.8 ms** to encode a 1000-product response (8001 objects, 32000 strings) | < 20 ms/request |
+| Browser | **~2.8 ms** first scan on a 806-element page; ~12 ms at 3206 elements | < 50 ms |
+| HTML | **~410 B raw per marker, ~12 B after gzip** | measure and decide |
 | `clean()` | ~22 ms over a whole 1000-product response | — |
 
 The HTML figure is the one to watch. Raw growth is large — markers are 12 bytes
@@ -187,6 +188,11 @@ with 500 marked strings costs roughly 6 KB gzipped.
 
 Browser numbers come from jsdom, which is slower than a real engine, so treat
 them as an upper bound. Scan time grows linearly with element count.
+
+Each marker also carries the ordinal of the string it was attached to, which is
+what lets the browser tell two renderings of one entity apart. It costs about
+13% more bytes per marker; on the server it costs nothing measurable, because
+the entity part of a marker is encoded once per object and reused.
 
 ## Requirements
 
@@ -214,9 +220,6 @@ nothing. The browser console says so when `devWarnings` is on.
 - **Another CMS's stega.** Markers coexist: ours uses a different prefix, and
   each decoder skips the other. Still simpler to turn the CMS's own stega off
   when you have your own editor.
-- **One entity rendered many times.** Each rendering is stamped separately, but
-  only when their occurrences sit in different branches of the page. Two
-  renderings inside one small shared container still resolve to that container.
 - **Vue and Svelte** are not covered yet.
 
 ## Roadmap

@@ -1,4 +1,5 @@
 import { PREFIX, PREFIX_LENGTH, bytesToChars, charsToBytes } from './alphabet.js';
+import { fieldSuffix } from './payload.js';
 
 // Layout: PREFIX (4 chars) + length header (2 bytes, 8 chars) + payload.
 // The explicit length is what lets a foreign stega marker sit directly after
@@ -22,15 +23,51 @@ export interface FoundMarker {
   payload: string;
 }
 
+// Both of these are looked up once per marked string, so they are memoised
+// rather than re-encoded. Without this the field ordinal doubles encode time.
+const headerCache: string[] = [];
+const suffixCache: Array<{ chars: string; bytes: number }> = [];
+
+function header(length: number): string {
+  const cached = headerCache[length];
+  if (cached !== undefined) return cached;
+  const built = bytesToChars(
+    new Uint8Array([HEADER_BIAS + ((length >> 6) & 0x3f), HEADER_BIAS + (length & 0x3f)]),
+  );
+  headerCache[length] = built;
+  return built;
+}
+
+function suffix(field: number): { chars: string; bytes: number } {
+  const cached = suffixCache[field];
+  if (cached !== undefined) return cached;
+  const encoded = encoder.encode(fieldSuffix(field));
+  const built = { chars: bytesToChars(encoded), bytes: encoded.length };
+  suffixCache[field] = built;
+  return built;
+}
+
 /** Returns `''` when the payload is too large for the length header. */
 export function encodeMarker(payload: string): string {
   const bytes = encoder.encode(payload);
   if (bytes.length > MAX_PAYLOAD_BYTES) return '';
-  const header = new Uint8Array([
-    HEADER_BIAS + ((bytes.length >> 6) & 0x3f),
-    HEADER_BIAS + (bytes.length & 0x3f),
-  ]);
-  return PREFIX + bytesToChars(header) + bytesToChars(bytes);
+  return PREFIX + header(bytes.length) + bytesToChars(bytes);
+}
+
+/**
+ * Every string an entity owns gets its own marker, differing only in a short
+ * trailing field ordinal. The entity part is encoded once per owner and its
+ * characters reused, so a marked string costs two cache lookups and a concat.
+ */
+export function markerBuilder(base: string): (field: number) => string {
+  const baseLength = encoder.encode(base).length;
+  const baseChars = bytesToChars(encoder.encode(base));
+  return (field: number) => {
+    const tail = suffix(field);
+    const length = baseLength + tail.bytes;
+    if (length > MAX_PAYLOAD_BYTES) return '';
+    return PREFIX + header(length) + baseChars + tail.chars;
+  };
 }
 
 export function hasMarker(text: string): boolean {

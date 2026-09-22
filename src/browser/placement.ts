@@ -3,6 +3,7 @@ import type { Stamp } from '../core/types.js';
 export interface Occurrence {
   element: Element;
   stamp: Stamp;
+  /** Entity identity, shared by every field of one entity. */
   key: string;
 }
 
@@ -15,7 +16,7 @@ export interface Placement {
 interface Group {
   key: string;
   stamp: Stamp;
-  elements: Element[];
+  occurrences: Occurrence[];
 }
 
 const MIXED = -1;
@@ -24,12 +25,12 @@ export function resolvePlacements(occurrences: Occurrence[]): Placement[] {
   const groups = new Map<string, Group>();
   for (const occurrence of occurrences) {
     const existing = groups.get(occurrence.key);
-    if (existing) existing.elements.push(occurrence.element);
+    if (existing) existing.occurrences.push(occurrence);
     else
       groups.set(occurrence.key, {
         key: occurrence.key,
         stamp: occurrence.stamp,
-        elements: [occurrence.element],
+        occurrences: [occurrence],
       });
   }
 
@@ -54,12 +55,14 @@ export function resolvePlacements(occurrences: Occurrence[]): Placement[] {
   for (const group of groups.values()) {
     const list = group.stamp.list;
     const owners = list ? ownership.get(list.ref) : undefined;
-    for (const cluster of splitRenderings(group.elements)) {
-      const anchor = lowestCommonAncestor(cluster);
-      if (!anchor || !isStampable(anchor)) continue;
-      const target = owners ? climbToItemRoot(anchor, owners, list!.index) : anchor;
-      if (!isStampable(target)) continue;
-      placements.push({ target, stamp: group.stamp, key: group.key });
+    for (const rendering of splitRenderings(group.occurrences)) {
+      for (const cluster of splitStranded(rendering)) {
+        const anchor = lowestCommonAncestor(cluster);
+        if (!anchor || !isStampable(anchor)) continue;
+        const target = owners ? climbToItemRoot(anchor, owners, list!.index) : anchor;
+        if (!isStampable(target)) continue;
+        placements.push({ target, stamp: group.stamp, key: group.key });
+      }
     }
   }
   return placements;
@@ -67,18 +70,41 @@ export function resolvePlacements(occurrences: Occurrence[]): Placement[] {
 
 /**
  * One entity can be rendered more than once on a page — an Astro page that
- * renders a list server-side and also passes it to an island produces markers
- * that are byte-identical, so every copy lands in one group. Taken together
- * their common ancestor is `<body>`, which is not stampable, and the entity
- * would get no attribute at all.
+ * renders a list server-side and also hands it to an island produces markers
+ * identical apart from the field ordinal each string carries.
  *
- * When that happens, split the occurrences by which branch of that ancestor
- * they sit under and treat each branch as its own rendering.
+ * A rendering shows each field at most once, so an ordinal appearing twice
+ * means a new rendering started. Occurrences arrive in document order and a
+ * rendering occupies one contiguous subtree, so one pass is enough.
  */
-function splitRenderings(elements: Element[]): Element[][] {
+function splitRenderings(occurrences: Occurrence[]): Element[][] {
+  const renderings: Element[][] = [];
+  let current: Element[] = [];
+  let seen = new Set<number>();
+
+  for (const occurrence of occurrences) {
+    const field = occurrence.stamp.field;
+    if (field !== undefined) {
+      if (seen.has(field)) {
+        renderings.push(current);
+        current = [];
+        seen = new Set();
+      }
+      seen.add(field);
+    }
+    current.push(occurrence.element);
+  }
+  if (current.length > 0) renderings.push(current);
+  return renderings;
+}
+
+/**
+ * Last resort for a rendering whose strings sit under `<body>` directly, or for
+ * markers carrying no field ordinal: split by branch rather than stamp nothing.
+ */
+function splitStranded(elements: Element[]): Element[][] {
   const anchor = lowestCommonAncestor(elements);
-  if (!anchor) return [];
-  if (isStampable(anchor)) return [elements];
+  if (!anchor || isStampable(anchor)) return [elements];
 
   const branches = new Map<Element, Element[]>();
   for (const element of elements) {
@@ -90,11 +116,10 @@ function splitRenderings(elements: Element[]): Element[][] {
   }
 
   const clusters: Element[][] = [];
-  for (const branch of branches.values()) clusters.push(...splitRenderings(branch));
+  for (const branch of branches.values()) clusters.push(...splitStranded(branch));
   return clusters;
 }
 
-/** The child of `ancestor` that `descendant` sits under, or null if it is the ancestor. */
 function branchOf(ancestor: Element, descendant: Element): Element | null {
   let node: Element | null = descendant;
   while (node && node.parentElement !== ancestor) node = node.parentElement;
@@ -113,8 +138,8 @@ function buildOwnership(ref: string, groups: Map<string, Group>): Map<Element, n
   for (const group of groups.values()) {
     const list = group.stamp.list;
     if (!list || list.ref !== ref) continue;
-    for (const element of group.elements) {
-      let node: Element | null = element;
+    for (const occurrence of group.occurrences) {
+      let node: Element | null = occurrence.element;
       while (node) {
         const seen = owners.get(node);
         if (seen === undefined) {

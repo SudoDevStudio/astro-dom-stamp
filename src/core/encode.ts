@@ -1,6 +1,6 @@
 import { isAlphabetChar } from './alphabet.js';
-import { encodeMarker, findLastMarker } from './marker.js';
-import { parseStamp, serializeStamp } from './payload.js';
+import { findLastMarker, markerBuilder } from './marker.js';
+import { parseStamp, serializeEntity } from './payload.js';
 import { isOpaqueParent, shouldSkipKey, shouldSkipValue } from './skip.js';
 import type { Stamp } from './types.js';
 
@@ -95,7 +95,9 @@ function walk(
 
 interface OwnerMarker {
   stamp: Stamp;
-  marker: string;
+  build: (field: number) => string;
+  /** Next field ordinal. Strings are numbered per owner, in property order. */
+  next: number;
 }
 
 function walkObject(
@@ -120,7 +122,7 @@ function walkObject(
   if (fields !== null) {
     const stamp: Stamp = { fields };
     if (slot) stamp.list = { ref: (slot.box.ref ??= nextListRef()), index: slot.index };
-    current = { stamp, marker: encodeMarker(serializeStamp(stamp)) };
+    current = { stamp, build: markerBuilder(serializeEntity(stamp)), next: 0 };
   }
 
   const target = state.copy ? ({} as Record<string, unknown>) : node;
@@ -132,15 +134,11 @@ function walkObject(
     const value = node[key];
     if (typeof value === 'string') {
       let next = value;
-      if (
-        current !== null &&
-        current.marker !== '' &&
-        !opaque &&
-        !shouldSkipKey(key, state.skip) &&
-        !shouldSkipValue(value) &&
-        !alreadyOwned(value, current)
-      ) {
-        next = value + current.marker;
+      if (current !== null && !opaque && !shouldSkipKey(key, state.skip) && !shouldSkipValue(value)) {
+        // The ordinal is consumed whether or not a marker is appended, so a
+        // response encoded twice numbers its fields the same way both times.
+        const field = current.next++;
+        if (!alreadyOwned(value, current)) next = value + current.build(field);
       }
       if (next !== value && !state.copy) {
         frozen ??= Object.isFrozen(node);
@@ -190,14 +188,9 @@ function walkArray(
 
     if (typeof value === 'string') {
       let next = value;
-      if (
-        owner !== null &&
-        owner.marker !== '' &&
-        !opaque &&
-        !shouldSkipValue(value) &&
-        !alreadyOwned(value, owner)
-      ) {
-        next = value + owner.marker;
+      if (owner !== null && !opaque && !shouldSkipValue(value)) {
+        const field = owner.next++;
+        if (!alreadyOwned(value, owner)) next = value + owner.build(field);
       }
       if (next !== value && !state.copy) {
         frozen ??= Object.isFrozen(node);
@@ -230,7 +223,6 @@ function walkArray(
  */
 function alreadyOwned(value: string, owner: OwnerMarker): boolean {
   if (!isAlphabetChar(value.charCodeAt(value.length - 1))) return false;
-  if (value.endsWith(owner.marker)) return true;
 
   const last = findLastMarker(value);
   if (last === undefined) return false;

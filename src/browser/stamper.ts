@@ -1,5 +1,5 @@
 import { findMarkers, hasMarker, stripMarkers } from '../core/marker.js';
-import { parseStamp } from '../core/payload.js';
+import { parseStamp, stampKey } from '../core/payload.js';
 import type { Stamp } from '../core/types.js';
 import { resolvePlacements, type Occurrence } from './placement.js';
 
@@ -131,7 +131,7 @@ function collect(text: string, element: Element, into: Occurrence[]): boolean {
   for (const marker of findMarkers(text)) {
     const stamp = parseStamp(marker.payload);
     if (!stamp) continue;
-    into.push({ element, stamp, key: marker.payload });
+    into.push({ element, stamp, key: stampKey(stamp) });
     found = true;
   }
   return found;

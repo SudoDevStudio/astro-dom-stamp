@@ -8,7 +8,21 @@ export function isOpaqueParent(key: string): boolean {
   return OPAQUE_PARENTS.has(key.toLowerCase());
 }
 
+// Object keys repeat across every item of a response, and deciding one costs a
+// toLowerCase plus several scans, so the answer is memoised per settings object.
+const decisions = new WeakMap<ReadonlySet<string>, Map<string, boolean>>();
+
 export function shouldSkipKey(key: string, skipFields: ReadonlySet<string>): boolean {
+  let cache = decisions.get(skipFields);
+  if (cache === undefined) decisions.set(skipFields, (cache = new Map()));
+  const known = cache.get(key);
+  if (known !== undefined) return known;
+  const decided = decideKey(key, skipFields);
+  cache.set(key, decided);
+  return decided;
+}
+
+function decideKey(key: string, skipFields: ReadonlySet<string>): boolean {
   if (key.charCodeAt(0) === 0x5f) return true;
   if (key.length > 2 && key.endsWith('Id')) return true;
 

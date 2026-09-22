@@ -59,12 +59,12 @@ describe('non-ASCII data', () => {
   it('encodes Gurmukhi content and Gurmukhi ids together', () => {
     const data = encode({ id: 'ਜੁੱਤੀ-5', title: 'ਨਰਮ ਜੁੱਤੀ', blurb: 'ਬਹੁਤ ਆਰਾਮਦਾਇਕ' }, defaultSettings);
     expect(stripMarkers(data.title)).toBe('ਨਰਮ ਜੁੱਤੀ');
-    expect(findMarkers(data.title)[0]?.payload).toBe('v1|id=ਜੁੱਤੀ-5');
+    expect(findMarkers(data.title)[0]?.payload).toBe('v1|id=ਜੁੱਤੀ-5|f=0');
   });
 
   it('keeps an emoji id intact', () => {
     const data = encode({ id: '👟-1', title: 'Shoe' }, defaultSettings);
-    expect(findMarkers(data.title)[0]?.payload).toBe('v1|id=👟-1');
+    expect(findMarkers(data.title)[0]?.payload).toBe('v1|id=👟-1|f=0');
   });
 
   it('does not split a surrogate pair at the join', () => {
