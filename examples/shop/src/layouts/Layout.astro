@@ -1,0 +1,49 @@
+---
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+const editing = import.meta.env.PUBLIC_ASTRO_DOM_STAMP_EDIT === 'true';
+---
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required. Without a declared UTF-8 charset the browser decodes the
+         page as windows-1252 and every marker is destroyed before the
+         stamper runs. -->
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <style>
+      :root { color-scheme: light dark; --line: color-mix(in srgb, currentColor 15%, transparent); }
+      body { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 2rem; max-width: 62rem; }
+      a { color: inherit; }
+      h1 { font-size: 1.6rem; margin: 0 0 .25rem; }
+      nav { display: flex; gap: 1rem; margin-bottom: 2rem; font-size: .9rem; }
+      .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); list-style: none; padding: 0; }
+      .card { border: 1px solid var(--line); border-radius: .6rem; padding: 1rem; }
+      .card h3 { margin: 0 0 .25rem; font-size: 1rem; }
+      .card p { margin: 0 0 .5rem; font-size: .9rem; opacity: .8; }
+      .variants { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; gap: .25rem; }
+      .variant { font-size: .8rem; border: 1px solid var(--line); border-radius: .4rem; padding: .25rem .5rem; }
+      [data-id] { outline: 1px dashed color-mix(in srgb, currentColor 30%, transparent); outline-offset: 3px; }
+      .banner { border: 1px solid var(--line); border-radius: .6rem; padding: .75rem 1rem; margin-bottom: 1.5rem; font-size: .85rem; }
+      section { margin-bottom: 2.5rem; }
+      h2 { font-size: 1.1rem; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="/">Shop</a>
+      <a href="/product/p0">A product</a>
+      <a href="/admin/">Admin (excluded)</a>
+    </nav>
+    {editing && (
+      <p class="banner">
+        Edit mode. Anything with a dashed outline was stamped by the browser
+        script; open the inspector to see <code>data-id</code>, <code>data-sku</code>.
+      </p>
+    )}
+    <slot />
+  </body>
+</html>

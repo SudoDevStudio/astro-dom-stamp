@@ -8,3 +8,4 @@ export { PREFIX, ALPHABET, DIGITS } from './alphabet.js';
 export { resolveOptions, kebabCase, DEFAULT_SKIP_FIELDS, DEFAULT_INCLUDE, DEFAULT_EXCLUDE } from './options.js';
 export type { AstroDomStampOptions, ResolvedOptions } from './options.js';
 export type { ListRef, Stamp } from './types.js';
+export { compileUrlPatterns, matchesUrl } from './urls.js';

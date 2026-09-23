@@ -1,0 +1,27 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { listProducts } from '../../lib/api.ts';
+
+// Same data, same helper. This path is listed in `excludeUrls`, so the
+// response carries no markers and the browser script does not run here.
+const products = await listProducts(Astro.url);
+const soldOut = products.filter((p) =>
+  p.variants.some((v) => v.availability === 'Back in three weeks'),
+);
+---
+<Layout title="Admin">
+  <h1>Admin</h1>
+  <p class="banner">
+    This path is in <code>excludeUrls</code>. Nothing is stamped here, and the
+    string comparison below sees the plain value — no <code>clean()</code> needed.
+  </p>
+  <p>{soldOut.length} of {products.length} products have a variant on back order.</p>
+  <ul class="grid">
+    {products.map((product) => (
+      <li class="card">
+        <h3>{product.title}</h3>
+        <p>{product.sku}</p>
+      </li>
+    ))}
+  </ul>
+</Layout>

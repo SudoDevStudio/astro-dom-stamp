@@ -1,0 +1,35 @@
+---
+import Layout from '../layouts/Layout.astro';
+import FeaturedRail from '../components/FeaturedRail.tsx';
+import LiveSearch from '../components/LiveSearch.tsx';
+import { listProducts } from '../lib/api.ts';
+
+const products = await listProducts(Astro.url);
+const featured = products.slice(0, 3);
+---
+<Layout title="Example Shop">
+  <h1>Catalogue</h1>
+
+  <section>
+    <h2>Server rendered</h2>
+    <ul class="grid">
+      {products.map((product) => (
+        <li class="card">
+          <h3><a href={`/product/${product.id}`}>{product.title}</a></h3>
+          <p>{product.tagline}</p>
+          <strong>{product.priceLabel}</strong>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  <section>
+    <h2>Hydrated island, same three products</h2>
+    <FeaturedRail products={featured} client:load />
+  </section>
+
+  <section>
+    <h2>Fetched in the browser</h2>
+    <LiveSearch client:only="react" />
+  </section>
+</Layout>

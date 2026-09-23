@@ -17,6 +17,11 @@ export interface AstroDomStampOptions {
   skipFields?: string[];
   include?: string[];
   exclude?: string[];
+  /**
+   * Paths where nothing should happen: no markers in the response, no scanning
+   * in the browser. `*` matches any characters, e.g. `['/admin/*', '/checkout/*']`.
+   */
+  excludeUrls?: string[];
   /** Remove markers from the text once the attribute is on the element. */
   stripAfterStamp?: boolean;
   /** Warn in the browser console about collisions and unsafe marker locations. */
@@ -47,6 +52,7 @@ export interface ResolvedOptions {
   skipFields: Set<string>;
   include: string[];
   exclude: string[];
+  excludeUrls: string[];
   stripAfterStamp: boolean;
   devWarnings: boolean;
 }
@@ -83,6 +89,7 @@ export function resolveOptions(options: AstroDomStampOptions): ResolvedOptions {
     skipFields,
     include: (options.include ?? [...DEFAULT_INCLUDE]).map(anchorGlob),
     exclude: (options.exclude ?? [...DEFAULT_EXCLUDE]).map(anchorGlob),
+    excludeUrls: [...(options.excludeUrls ?? [])],
     stripAfterStamp: options.stripAfterStamp ?? false,
     devWarnings: options.devWarnings ?? true,
   };

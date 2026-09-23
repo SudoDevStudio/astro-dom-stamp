@@ -1,12 +1,15 @@
 import { findMarkers, hasMarker, stripMarkers } from '../core/marker.js';
 import { parseStamp, stampKey } from '../core/payload.js';
 import type { Stamp } from '../core/types.js';
+import { compileUrlPatterns, matchesUrl } from '../core/urls.js';
 import { resolvePlacements, type Occurrence } from './placement.js';
 
 export interface StamperConfig {
   attributes: Record<string, string>;
   stripAfterStamp: boolean;
   devWarnings: boolean;
+  /** Path patterns where the stamper does nothing at all. */
+  excludeUrls?: string[];
 }
 
 export interface Stamper {
@@ -22,6 +25,7 @@ const UNSAFE_ATTRIBUTES = ['class', 'id', 'href', 'src', 'style'];
 const LOG_PREFIX = '[astro-dom-stamp]';
 
 export function createStamper(config: StamperConfig): Stamper {
+  const excluded = compileUrlPatterns(config.excludeUrls ?? []);
   const warnedKeys = new Set<string>();
   let observer: MutationObserver | null = null;
   let scheduled = 0;
@@ -29,7 +33,7 @@ export function createStamper(config: StamperConfig): Stamper {
 
   function scan(): void {
     const body = document.body;
-    if (!body) return;
+    if (!body || isExcluded()) return;
 
     const occurrences: Occurrence[] = [];
     const markedText: Text[] = [];
@@ -90,8 +94,15 @@ export function createStamper(config: StamperConfig): Stamper {
     });
   }
 
+  function isExcluded(): boolean {
+    return excluded.length > 0 && matchesUrl(location.pathname, excluded);
+  }
+
   function start(): void {
     if (observer) return;
+    // Re-checked on every scan too: a view transition changes the path without
+    // reloading, so an excluded page can be navigated into and back out of.
+    if (isExcluded() && !hasViewTransitions()) return;
     if (config.devWarnings) warnAboutCharset(warnedKeys);
     observer = new MutationObserver((records) => {
       if (applying) return;
@@ -210,6 +221,10 @@ function warnOnce(seen: Set<string>, key: string, emit: () => void): void {
   if (seen.has(key)) return;
   seen.add(key);
   emit();
+}
+
+function hasViewTransitions(): boolean {
+  return document.querySelector('[name="astro-view-transitions-enabled"]') !== null;
 }
 
 function requestIdle(run: () => void): number {

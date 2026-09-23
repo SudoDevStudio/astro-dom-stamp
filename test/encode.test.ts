@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { decodeStamps } from '../src/core/clean.js';
 import { encode, encodeResult } from '../src/core/encode.js';
 import { createEncoder } from '../src/runtime/encode.js';
+import { setScopeProvider } from '../src/runtime/scope.js';
 import { hasMarker } from '../src/core/marker.js';
 import type { Stamp } from '../src/core/types.js';
 import { defaultSettings, settingsFor } from './settings.js';
@@ -288,5 +289,39 @@ describe('field ordinals', () => {
     const inBrowser = encode(overTheWire, defaultSettings);
     expect(inBrowser.title).toBe(onServer.title);
     expect(inBrowser.blurb).toBe(onServer.blurb);
+  });
+});
+
+describe('excludeUrls on the server', () => {
+  const encoder = createEncoder({ read: ['id'], excludeUrls: ['/admin/*'] });
+
+  afterEach(() => setScopeProvider(null));
+
+  it('encodes when the request is not excluded', () => {
+    setScopeProvider(() => ({ skip: false }));
+    expect(hasMarker(encoder.__encode({ id: '5', title: 'Shoe' }).title)).toBe(true);
+  });
+
+  it('leaves the data alone when the request is excluded', () => {
+    setScopeProvider(() => ({ skip: true }));
+    const input = { id: '5', title: 'Shoe' };
+    expect(encoder.__encode(input)).toBe(input);
+    expect(input.title).toBe('Shoe');
+  });
+
+  it('leaves a promised result alone too', async () => {
+    setScopeProvider(() => ({ skip: true }));
+    const data = await encoder.__encodeResult(Promise.resolve({ id: '5', title: 'Shoe' }));
+    expect(hasMarker(data.title)).toBe(false);
+  });
+
+  it('encodes when no scope was installed at all', () => {
+    expect(hasMarker(encoder.__encode({ id: '5', title: 'Shoe' }).title)).toBe(true);
+  });
+
+  it('never consults a scope when nothing is excluded', () => {
+    setScopeProvider(() => ({ skip: true }));
+    const plain = createEncoder({ read: ['id'] });
+    expect(hasMarker(plain.__encode({ id: '5', title: 'Shoe' }).title)).toBe(true);
   });
 });

@@ -11,3 +11,6 @@ export const VIRTUAL_RUNTIME = 'virtual:astro-dom-stamp/runtime';
 export const RUNTIME_IMPORT =
   `import { ${ENCODE_IMPORT} as ${ENCODE_LOCAL}, ` +
   `${ENCODE_RESULT_IMPORT} as ${ENCODE_RESULT_LOCAL} } from '${VIRTUAL_RUNTIME}';\n`;
+
+/** Rule name used in the coverage report for a plain `.json()` call. */
+export const JSON_RULE = '.json()';

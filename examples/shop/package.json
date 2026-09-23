@@ -1,0 +1,22 @@
+{
+  "name": "astro-dom-stamp-example-shop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "dev:edit": "ASTRO_DOM_STAMP_EDIT=true astro dev",
+    "build": "astro build",
+    "build:edit": "ASTRO_DOM_STAMP_EDIT=true astro build",
+    "start": "node dist/server/entry.mjs"
+  },
+  "dependencies": {
+    "@sudodevstudio/astro-dom-stamp": "file:../.."
+  },
+  "devDependencies": {
+    "@astrojs/node": "^11.1.6",
+    "@astrojs/react": "^7.0.0",
+    "astro": "^7.3.3",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  }
+}

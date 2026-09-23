@@ -154,17 +154,47 @@ Two entities resolving to the same element: the first wins, and the second is
 reported in the console. An attribute already written in your markup is never
 overwritten.
 
+## Turning it off for some paths
+
+An admin screen or a checkout flow usually wants none of this — not the
+attributes, and especially not the markers, since those are what can upset
+string logic.
+
+```js
+astroDomStamp({
+  read: ['id', 'uid', 'sku'],
+  enabled: process.env.ASTRO_DOM_STAMP_EDIT === 'true',
+  excludeUrls: ['/admin/*', '/checkout/*'],
+});
+```
+
+This works on both ends. The browser script does nothing on those paths, and the
+server does not encode for them either: the integration adds a middleware that
+scopes the decision to the request, so a shared fetch helper returns plain data
+when the page asking for it is excluded, and marked data everywhere else. An
+excluded page behaves exactly as it does in production.
+
+`*` matches any characters including `/`, and a pattern ending in `/*` also
+matches the path without the trailing slash — `/admin/*` covers `/admin`,
+`/admin/` and `/admin/users/42`.
+
+The middleware is only registered when `excludeUrls` is non-empty.
+
 ## Reading data back
 
 Markers are real characters. Anything that inspects a string rather than
 displaying it needs them gone first:
 
 ```ts
-import { clean, cleanString } from '@sudodevstudio/astro-dom-stamp';
+import { clean, cleanString } from '@sudodevstudio/astro-dom-stamp/core';
 
 if (cleanString(product.status) === 'sold') { /* ... */ }
 const payload = clean(product);        // deep, for comparisons or an API call
 ```
+
+Import these from `/core`, not from the package root. The root is the
+integration and reaches the build-time transform, which carries a Rust parser —
+a client component importing from it pulls all of that into the browser bundle.
 
 `clean()` removes only our markers. Another CMS's stega on the same string is
 left exactly where it was.
@@ -179,6 +209,7 @@ left exactly where it was.
 | `skipFields` | `string[]` | see below | Extra keys whose values are never marked. |
 | `include` | `string[]` | `src/**/*.{astro,ts,js,mjs,tsx,jsx}` | Files the transform covers. A project-relative glob is anchored for you, since Vite passes absolute ids. |
 | `exclude` | `string[]` | `**/node_modules/**` | Files it skips. |
+| `excludeUrls` | `string[]` | `[]` | Paths where nothing happens at all. `*` matches any characters, so `/admin/*` covers `/admin` and everything under it. |
 | `stripAfterStamp` | `boolean` | `false` | Remove markers from the text once the attribute is on. |
 | `devWarnings` | `boolean` | `true` | Warn about collisions and markers in unsafe places. |
 
@@ -256,6 +287,15 @@ nothing. The browser console says so when `devWarnings` is on.
 - **Build time on a worst-case codebase.** A file with no fetch point is never
   parsed, so cost tracks how many files actually fetch. At one in ten it is
   around 4%; if every file fetches it is around 14%, over the 10% budget.
+
+## Try it
+
+[`examples/shop`](examples/shop) is a small SSR site with a generated catalogue,
+its own API, React islands and an excluded `/admin/` path.
+
+```sh
+npm install && npm run build && npm run example
+```
 
 ## Roadmap
 

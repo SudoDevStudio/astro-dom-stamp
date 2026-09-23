@@ -18,6 +18,9 @@
     "cms"
   ],
   "type": "module",
+  "workspaces": [
+    "examples/*"
+  ],
   "files": [
     "dist",
     "README.md",
@@ -41,7 +44,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "bench": "npm run build && node --experimental-strip-types bench/run.ts",
-    "size": "npm run build && node --experimental-strip-types bench/size.ts"
+    "size": "npm run build && node --experimental-strip-types bench/size.ts",
+    "example": "npm run build && npm --workspace astro-dom-stamp-example-shop run dev:edit"
   },
   "peerDependencies": {
     "astro": "^7.0.0"

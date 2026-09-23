@@ -1,0 +1,40 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getProduct } from '../../lib/api.ts';
+
+const { id } = Astro.params;
+let product;
+try {
+  product = await getProduct(id!, Astro.url);
+} catch {
+  return new Response('Not found', { status: 404 });
+}
+---
+<Layout title={product.title}>
+  <article class="card">
+    <h1>{product.title}</h1>
+    <p>{product.tagline}</p>
+    <p>{product.description}</p>
+    <strong>{product.priceLabel}</strong>
+
+    <h2>Variants</h2>
+    <ul class="variants">
+      {product.variants.map((variant) => (
+        <li class="variant">
+          <span>{variant.label}</span> — <span>{variant.availability}</span>
+          <strong>{variant.priceLabel}</strong>
+        </li>
+      ))}
+    </ul>
+
+    <h2>Reviews</h2>
+    <ul class="variants">
+      {product.reviews.map((review) => (
+        <li class="variant">
+          <strong>{review.author}</strong>
+          <p>{review.body}</p>
+        </li>
+      ))}
+    </ul>
+  </article>
+</Layout>

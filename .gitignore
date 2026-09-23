@@ -154,3 +154,6 @@ dist/
 
 # Generated build-time benchmark project
 bench/build/project/
+
+# Astro generated types in the example
+examples/**/.astro/

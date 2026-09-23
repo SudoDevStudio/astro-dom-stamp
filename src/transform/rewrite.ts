@@ -3,6 +3,7 @@ import { parseSync, visitorKeys } from 'oxc-parser';
 import {
   ENCODE_LOCAL,
   ENCODE_RESULT_LOCAL,
+  JSON_RULE,
   RUNTIME_IMPORT,
   VIRTUAL_RUNTIME,
 } from './names.js';
@@ -15,8 +16,6 @@ export interface RewriteOptions {
   sources?: SourceMatcher[];
 }
 
-/** Which rule matched, counted so a build can report coverage. */
-export const JSON_RULE = '.json()';
 
 export interface RewriteResult {
   code: string;
