@@ -19,8 +19,17 @@ describe('single object', () => {
     const p = server({ id: 'p1', sku: 'AB-1', title: 'Shoe' });
     stamp(`<h1>${p.title}</h1>`);
     const element = stamped('p1')!;
+    expect(element.getAttribute('data-stamp-id')).toBe('p1');
+    expect(element.getAttribute('data-stamp-sku')).toBe('AB-1');
+    // `uid` was asked for but this object has none, so no empty attribute.
+    expect(element.hasAttribute('data-stamp-uid')).toBe(false);
+  });
+
+  it('honours a custom prefix', () => {
+    const p = server({ id: 'p1', sku: 'AB-1', title: 'Shoe' });
+    stamp(`<h1>${p.title}</h1>`, { attributePrefix: 'data-' });
+    const element = document.querySelector('[data-id="p1"]')!;
     expect(element.getAttribute('data-sku')).toBe('AB-1');
-    expect(element.hasAttribute('data-uid')).toBe(false);
   });
 });
 
@@ -125,21 +134,21 @@ describe('conflicts', () => {
     const b = server({ id: 'b1', title: 'Two' });
     stamp(`<p>${a.title} ${b.title}</p>`);
     const p = document.querySelector('p')!;
-    expect(p.getAttribute('data-id')).toBe('a1');
+    expect(p.getAttribute('data-stamp-id')).toBe('a1');
     expect(stamped('b1')).toBeNull();
   });
 
   it('never overwrites an attribute already in the markup', () => {
     const p = server({ id: 'p1', title: 'Shoe' });
-    stamp(`<h1 data-id="hand-written">${p.title}</h1>`);
-    expect(document.querySelector('h1')!.getAttribute('data-id')).toBe('hand-written');
+    stamp(`<h1 data-stamp-id="hand-written">${p.title}</h1>`);
+    expect(document.querySelector('h1')!.getAttribute('data-stamp-id')).toBe('hand-written');
   });
 
   it('never targets body or html', () => {
     const a = server({ id: 'a1', t: 'One' });
     const b = server({ id: 'b1', t: 'Two' });
     stamp(`${a.t}<div>${b.t}</div>`);
-    expect(document.body.hasAttribute('data-id')).toBe(false);
+    expect(document.body.hasAttribute('data-stamp-id')).toBe(false);
   });
 });
 
@@ -178,7 +187,7 @@ describe('one entity rendered more than once', () => {
       `<section class="hero"><h1>${p.title}</h1><p>${p.blurb}</p></section>` +
         `<aside class="rail"><h3>${p.title}</h3><p>${p.blurb}</p></aside>`,
     );
-    const stampedElements = [...document.querySelectorAll('[data-id="p1"]')];
+    const stampedElements = [...document.querySelectorAll('[data-stamp-id="p1"]')];
     expect(stampedElements.map(describeElement)).toEqual(['section.hero', 'aside.rail']);
   });
 
@@ -194,11 +203,11 @@ describe('one entity rendered more than once', () => {
         .join('') +
       '</ul>';
     stamp(list('server') + list('island'));
-    expect([...document.querySelectorAll('[data-id="p1"]')].map(describeElement)).toEqual([
+    expect([...document.querySelectorAll('[data-stamp-id="p1"]')].map(describeElement)).toEqual([
       'li.server-card',
       'li.island-card',
     ]);
-    expect(document.querySelectorAll('[data-id]')).toHaveLength(4);
+    expect(document.querySelectorAll('[data-stamp-id]')).toHaveLength(4);
   });
 
   it('leaves a single rendering with a nested entity alone', () => {
@@ -231,11 +240,11 @@ describe('repeated renderings inside one container', () => {
         `<section class="b"><h1>${p.title}</h1><p>${p.blurb}</p></section>` +
         `</main>`,
     );
-    expect([...document.querySelectorAll('[data-id="p1"]')].map(describeElement)).toEqual([
+    expect([...document.querySelectorAll('[data-stamp-id="p1"]')].map(describeElement)).toEqual([
       'section.a',
       'section.b',
     ]);
-    expect(document.querySelector('main')!.hasAttribute('data-id')).toBe(false);
+    expect(document.querySelector('main')!.hasAttribute('data-stamp-id')).toBe(false);
   });
 
   it('keeps a single rendering whole when a nested entity shares its ancestor', () => {
@@ -255,7 +264,7 @@ describe('repeated renderings inside one container', () => {
         `</div>`,
     );
     expect(describeElement(stamped('p1'))).toBe('article.card');
-    expect(document.querySelectorAll('[data-id="p1"]')).toHaveLength(1);
+    expect(document.querySelectorAll('[data-stamp-id="p1"]')).toHaveLength(1);
   });
 
   it('handles a rendering that shows only some of the fields', () => {
@@ -266,7 +275,7 @@ describe('repeated renderings inside one container', () => {
         `<section class="teaser"><h2>${p.title}</h2></section>` +
         `</main>`,
     );
-    expect([...document.querySelectorAll('[data-id="p1"]')].map(describeElement)).toEqual([
+    expect([...document.querySelectorAll('[data-stamp-id="p1"]')].map(describeElement)).toEqual([
       'section.full',
       'h2',
     ]);
@@ -282,7 +291,7 @@ describe('repeated renderings inside one container', () => {
       products.map((p) => `<li class="${cls}-card"><h3>${p.title}</h3><p>${p.blurb}</p></li>`).join('') +
       `</ul>`;
     stamp(`<main>${list('a')}${list('b')}${list('c')}</main>`);
-    expect([...document.querySelectorAll('[data-id="p1"]')].map(describeElement)).toEqual([
+    expect([...document.querySelectorAll('[data-stamp-id="p1"]')].map(describeElement)).toEqual([
       'li.a-card',
       'li.b-card',
       'li.c-card',

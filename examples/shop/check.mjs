@@ -60,7 +60,7 @@ async function stampedOn(path) {
   await page.goto(ORIGIN + path, { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
   const found = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-id]')].map((el) => el.getAttribute('data-id')),
+    [...document.querySelectorAll('[data-stamp-id]')].map((el) => el.getAttribute('data-stamp-id')),
   );
   await browser.close();
   return { found, messages };

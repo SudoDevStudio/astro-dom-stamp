@@ -50,11 +50,11 @@ async function visit() {
   await page.goto(ORIGIN + '/', { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
   const stamped = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-id]')].map((el) => ({
+    [...document.querySelectorAll('[data-stamp-id]')].map((el) => ({
       cls: el.getAttribute('class'),
       tag: el.tagName,
-      id: el.getAttribute('data-id'),
-      sku: el.getAttribute('data-sku'),
+      id: el.getAttribute('data-stamp-id'),
+      sku: el.getAttribute('data-stamp-sku'),
     })),
   );
   const rendered = await page.evaluate(() =>

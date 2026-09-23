@@ -40,7 +40,7 @@ describe('edit build', () => {
 
     expect(injected).toHaveLength(1);
     expect(injected[0]).toContain('createStamper');
-    expect(injected[0]).toContain('"data-sku"');
+    expect(injected[0]).toContain('"data-stamp-sku"');
 
     const plugins = (configs[0] as { vite: { plugins: Array<{ name: string }> } }).vite.plugins;
     expect(plugins.map((p) => p.name)).toEqual([

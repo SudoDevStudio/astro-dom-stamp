@@ -33,14 +33,14 @@ describe('the stamper on an excluded path', () => {
     document.body.innerHTML = `<h1>${p.title}</h1>`;
     run('/admin/settings', ['/admin/*']);
     await settle();
-    expect(document.querySelector('[data-id]')).toBeNull();
+    expect(document.querySelector('[data-stamp-id]')).toBeNull();
   });
 
   it('stamps nothing even on a direct scan', () => {
     const p = server({ id: 'p1', title: 'Shoe' });
     document.body.innerHTML = `<h1>${p.title}</h1>`;
     run('/admin', ['/admin/*'], { immediate: true });
-    expect(document.querySelector('[data-id]')).toBeNull();
+    expect(document.querySelector('[data-stamp-id]')).toBeNull();
   });
 
   it('leaves the markers in the text rather than half-processing it', () => {
@@ -57,7 +57,7 @@ describe('the stamper on an excluded path', () => {
     const p = server({ id: 'p2', title: 'Boot' });
     document.querySelector('#root')!.innerHTML = `<h1>${p.title}</h1>`;
     await settle();
-    expect(document.querySelector('[data-id]')).toBeNull();
+    expect(document.querySelector('[data-stamp-id]')).toBeNull();
   });
 });
 
@@ -67,7 +67,7 @@ describe('the stamper on a path that is not excluded', () => {
     document.body.innerHTML = `<h1>${p.title}</h1>`;
     run('/shop/shoes', ['/admin/*']);
     await settle();
-    expect(document.querySelector('[data-id="p1"]')).not.toBeNull();
+    expect(document.querySelector('[data-stamp-id="p1"]')).not.toBeNull();
   });
 
   it('is unaffected when no path is excluded', async () => {
@@ -75,6 +75,6 @@ describe('the stamper on a path that is not excluded', () => {
     document.body.innerHTML = `<h1>${p.title}</h1>`;
     run('/admin/settings', []);
     await settle();
-    expect(document.querySelector('[data-id="p1"]')).not.toBeNull();
+    expect(document.querySelector('[data-stamp-id="p1"]')).not.toBeNull();
   });
 });

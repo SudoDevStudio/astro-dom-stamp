@@ -49,13 +49,26 @@ describe('options', () => {
     expect(() => resolveOptions({ read: [LIST_KEY] })).toThrow(/reserved/);
   });
 
-  it('kebab-cases attribute names', () => {
+  it('kebab-cases attribute names under the namespaced prefix', () => {
     expect(resolveOptions({ read: ['id', 'productId', 'sku_code'] }).attributes).toEqual({
-      id: 'data-id',
-      productId: 'data-product-id',
-      sku_code: 'data-sku-code',
+      id: 'data-stamp-id',
+      productId: 'data-stamp-product-id',
+      sku_code: 'data-stamp-sku-code',
     });
   });
+
+  it('takes a custom prefix', () => {
+    expect(resolveOptions({ read: ['id'], attributePrefix: 'data-' }).attributes).toEqual({
+      id: 'data-id',
+    });
+  });
+
+  it.each(['stamp-', 'x-stamp-', 'data-STAMP-', 'data-my stamp-', ''])(
+    'refuses the prefix %j',
+    (attributePrefix) => {
+      expect(() => resolveOptions({ read: ['id'], attributePrefix })).toThrow(/attributePrefix/);
+    },
+  );
 
   it('adds the read keys to skipFields, so ids never carry markers', () => {
     expect(resolveOptions({ read: ['uid'] }).skipFields.has('uid')).toBe(true);

@@ -30,7 +30,7 @@ describe('watching the page', () => {
     document.body.innerHTML = `<h1>${p.title}</h1>`;
     start();
     await settle();
-    expect(document.querySelector('[data-id="p1"]')).not.toBeNull();
+    expect(document.querySelector('[data-stamp-id="p1"]')).not.toBeNull();
   });
 
   it('stamps nodes added later, as a client:only island or a browser fetch would', async () => {
@@ -42,7 +42,7 @@ describe('watching the page', () => {
     document.querySelector('#root')!.innerHTML =
       `<article><h1>${p.title}</h1><p>${p.blurb}</p></article>`;
     await settle();
-    expect(document.querySelector('[data-id="p2"]')?.tagName).toBe('ARTICLE');
+    expect(document.querySelector('[data-stamp-id="p2"]')?.tagName).toBe('ARTICLE');
   });
 
   it('re-stamps after a re-render replaces the text node', async () => {
@@ -52,10 +52,10 @@ describe('watching the page', () => {
     await settle();
 
     const heading = document.querySelector('h1')!;
-    heading.removeAttribute('data-id');
+    heading.removeAttribute('data-stamp-id');
     heading.textContent = p.title;
     await settle();
-    expect(heading.getAttribute('data-id')).toBe('p1');
+    expect(heading.getAttribute('data-stamp-id')).toBe('p1');
   });
 
   it('does not loop when stripping markers triggers its own mutations', async () => {
@@ -65,7 +65,7 @@ describe('watching the page', () => {
     await settle();
     await settle();
     expect(document.querySelector('h1')!.textContent).toBe('Shoe');
-    expect(document.querySelector('[data-id="p1"]')).not.toBeNull();
+    expect(document.querySelector('[data-stamp-id="p1"]')).not.toBeNull();
   });
 
   it('stops watching after stop()', async () => {
@@ -77,7 +77,7 @@ describe('watching the page', () => {
     const p = server({ id: 'p3', title: 'Clog' });
     document.querySelector('#root')!.innerHTML = `<h1>${p.title}</h1>`;
     await settle();
-    expect(document.querySelector('[data-id="p3"]')).toBeNull();
+    expect(document.querySelector('[data-stamp-id="p3"]')).toBeNull();
   });
 });
 

@@ -2,10 +2,18 @@ import { FIELD_KEY, LIST_KEY } from './payload.js';
 
 export interface AstroDomStampOptions {
   /**
-   * Keys that become attributes: `id` -> `data-id`. Required.
-   * camelCase is kebab-cased, so `productId` -> `data-product-id`.
+   * Keys that become attributes: `id` -> `data-stamp-id`. Required.
+   * camelCase is kebab-cased, so `productId` -> `data-stamp-product-id`.
+   * Every listed key an object carries gets its own attribute.
    */
   read: string[];
+  /**
+   * Prefix for the attributes written. Namespaced by default because plain
+   * `data-id` is common in real markup, and an attribute already in the markup
+   * is never overwritten — so a collision means that element silently never
+   * gets stamped.
+   */
+  attributePrefix?: string;
   /**
    * `true` only for the edit build. When `false` the integration registers
    * nothing at all: no transform, no encoder in the bundle, no browser script.
@@ -44,8 +52,11 @@ export const DEFAULT_SKIP_FIELDS = [
 export const DEFAULT_INCLUDE = ['src/**/*.{astro,ts,js,mjs,tsx,jsx,vue,svelte}'] as const;
 export const DEFAULT_EXCLUDE = ['**/node_modules/**'] as const;
 
+export const DEFAULT_ATTRIBUTE_PREFIX = 'data-stamp-';
+
 export interface ResolvedOptions {
   read: string[];
+  attributePrefix: string;
   attributes: Record<string, string>;
   enabled: boolean;
   sources: string[];
@@ -78,11 +89,19 @@ export function resolveOptions(options: AstroDomStampOptions): ResolvedOptions {
   // Read-key values end up in URLs and comparisons, never in prose.
   for (const key of read) skipFields.add(key.toLowerCase());
 
+  const attributePrefix = options.attributePrefix ?? DEFAULT_ATTRIBUTE_PREFIX;
+  if (!/^data-[a-z0-9-]*$/.test(attributePrefix) || attributePrefix.endsWith('--')) {
+    throw new Error(
+      `[astro-dom-stamp] \`attributePrefix\` must start with "data-" and hold only lowercase letters, digits and hyphens; got "${attributePrefix}".`,
+    );
+  }
+
   const attributes: Record<string, string> = {};
-  for (const key of read) attributes[key] = `data-${kebabCase(key)}`;
+  for (const key of read) attributes[key] = `${attributePrefix}${kebabCase(key)}`;
 
   return {
     read: [...read],
+    attributePrefix,
     attributes,
     enabled: options.enabled ?? false,
     sources: [...(options.sources ?? [])],

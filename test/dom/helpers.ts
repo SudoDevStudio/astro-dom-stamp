@@ -21,7 +21,7 @@ export function stamp(html: string, options: Partial<AstroDomStampOptions> = {})
 }
 
 export function stamped(value: string): Element | null {
-  return document.querySelector(`[data-id="${value}"]`);
+  return document.querySelector(`[data-stamp-id="${value}"]`);
 }
 
 export function describeElement(element: Element | null): string {

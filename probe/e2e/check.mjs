@@ -2,7 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { rmSync } from 'node:fs';
 import { JSDOM } from 'jsdom';
 import { createStamper } from '@sudodevstudio/astro-dom-stamp/browser';
-import { decodeStamps } from '@sudodevstudio/astro-dom-stamp/core';
+import { decodeStamps, resolveOptions } from '@sudodevstudio/astro-dom-stamp/core';
 
 const here = new URL('.', import.meta.url).pathname;
 const PORT = 4399;
@@ -62,16 +62,17 @@ const dom = new JSDOM(editHtml);
 for (const key of ['document', 'Node', 'NodeFilter', 'MutationObserver', 'Element']) {
   globalThis[key] = dom.window[key];
 }
+// Built from resolveOptions, so the probe always uses the real attribute names.
 createStamper({
-  attributes: Object.fromEntries(READ.map((k) => [k, `data-${k}`])),
+  attributes: resolveOptions({ read: READ }).attributes,
   stripAfterStamp: false,
   devWarnings: false,
 }).scan();
 
-const cards = [...dom.window.document.querySelectorAll('[data-id]')];
+const cards = [...dom.window.document.querySelectorAll('[data-stamp-id]')];
 check('stamper puts attributes on the .map element', cards.length === 2 && cards.every((c) => c.tagName === 'LI'),
-  cards.map((c) => `${c.tagName}#${c.getAttribute('data-id')}`).join(' '));
-check('stamper carries every read key present', cards[0]?.getAttribute('data-sku') === 'AB-1');
+  cards.map((c) => `${c.tagName}#${c.getAttribute('data-stamp-id')}`).join(' '));
+check('stamper carries every read key present', cards[0]?.getAttribute('data-stamp-sku') === 'AB-1');
 dom.window.close();
 
 build(false);

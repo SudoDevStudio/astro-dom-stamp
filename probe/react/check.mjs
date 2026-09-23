@@ -51,11 +51,11 @@ async function visit() {
   // The stamper's first pass is scheduled on idle after `load`.
   await page.waitForTimeout(700);
   const stamped = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-id]')].map((el) => ({
+    [...document.querySelectorAll('[data-stamp-id]')].map((el) => ({
       cls: el.getAttribute('class'),
       tag: el.tagName,
-      id: el.getAttribute('data-id'),
-      sku: el.getAttribute('data-sku'),
+      id: el.getAttribute('data-stamp-id'),
+      sku: el.getAttribute('data-stamp-sku'),
     })),
   );
   const liveCards = await page.evaluate(() => document.querySelectorAll('.live-card').length);

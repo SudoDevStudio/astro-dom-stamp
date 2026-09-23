@@ -23,14 +23,14 @@ npx astro dev                               # production behaviour
 ```
 
 Then open the pages. In edit mode anything the browser script stamped gets a
-dashed outline; the inspector shows `data-id`, `data-sku`.
+dashed outline; the inspector shows `data-stamp-id`, `data-stamp-sku`.
 
 ## What each page is for
 
 | Page | Shows |
 | --- | --- |
 | `/` | A server-rendered grid, a `client:load` island rendering **the same three products**, and a `client:only` island that fetches in the browser |
-| `/product/p0` | A single object, with nested variants and reviews that each get their own element |
+| `/product/p0` | A single object, with nested variants and reviews that each get their own element. A product carries both keys, so it gets both attributes: `data-stamp-id="p0" data-stamp-sku="SKU-1000"`. A review has no sku, so it gets only `data-stamp-id` |
 | `/admin/` | A path in `excludeUrls`: same data, same helper, no markers and no stamping |
 
 `/` is the interesting one. The grid and the island render the same products

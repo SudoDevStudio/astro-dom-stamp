@@ -1,9 +1,9 @@
 # astro-dom-stamp
 
-Put `data-id`, `data-uid` and `data-sku` on the elements your fetched data
-renders into, so a custom visual editor knows what it is looking at — without
-touching a thousand templates by hand, and without costing anything in
-production.
+Put `data-stamp-id`, `data-stamp-uid` and `data-stamp-sku` on the elements your
+fetched data renders into, so a custom visual editor knows what it is looking
+at — without touching a thousand templates by hand, and without costing anything
+in production.
 
 ```sh
 npm install @sudodevstudio/astro-dom-stamp
@@ -150,9 +150,22 @@ const products = __encode(await db.products.findMany());
 A grid with several cards per row still stops at the card, because the row
 covers more than one item.
 
+An object carrying several of the `read` keys gets one attribute each:
+
+```html
+<li class="card" data-stamp-id="p1" data-stamp-sku="SKU-1001">…</li>
+```
+
+The value goes in the attribute value, not the name — unlike Astro's own
+`data-astro-cid-ju4pidww`, where the identifier is part of the name.
+
+The `data-stamp-` prefix is there because plain `data-id` is common in real
+markup, and an attribute already in your markup is never overwritten — a
+collision would mean that element silently never gets stamped. Set
+`attributePrefix: 'data-'` if your editor needs the short form.
+
 Two entities resolving to the same element: the first wins, and the second is
-reported in the console. An attribute already written in your markup is never
-overwritten.
+reported in the console.
 
 ## Turning it off for some paths
 
@@ -203,7 +216,8 @@ left exactly where it was.
 
 | Option | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `read` | `string[]` | **required** | Keys that become attributes. `id` → `data-id`, `productId` → `data-product-id`. |
+| `read` | `string[]` | **required** | Keys that become attributes. `id` → `data-stamp-id`, `productId` → `data-stamp-product-id`. Every listed key the object carries gets its own attribute. |
+| `attributePrefix` | `string` | `data-stamp-` | Prefix for those attributes. Must start with `data-`. |
 | `enabled` | `boolean` | `false` | `true` for the edit build. `false` registers nothing at all. |
 | `sources` | `string[]` | `[]` | Extra call expressions to wrap, e.g. `client.query`, `useQuery`, `api.*`. `*` matches one path segment. |
 | `skipFields` | `string[]` | see below | Extra keys whose values are never marked. |
