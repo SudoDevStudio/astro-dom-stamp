@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # oxc-parser ships roughly weekly and both parsers are 0.x, so drift is found
+  # on a schedule rather than on the next release that happens to break us.
+  schedule:
+    - cron: '0 6 * * 1'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # @astrojs/svelte 9 still declares a peer range of ^5.3.3 || ^6.0.0 for
+      # TypeScript, which this repo is past.
+      - run: npm ci --legacy-peer-deps
+      - run: npm run build
+      - run: npm run typecheck
+      - run: npm test
+
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npx playwright install --with-deps chromium
+      # Builds real Astro projects and drives a real browser: this is what
+      # catches an Astro or parser upgrade changing where our transform sits.
+      - run: npm run verify
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm run build
+      # Install the tarball somewhere that knows nothing about this repo, so a
+      # wrong export map or `files` entry fails here rather than on publish.
+      - name: Install the packed tarball into a clean project
+        run: |
+          npm pack --pack-destination /tmp
+          mkdir -p /tmp/clean && cd /tmp/clean
+          npm init -y >/dev/null
+          npm pkg set type=module >/dev/null
+          npm install --silent astro@^7.3.3 @astrojs/node@^11.1.6 /tmp/sudodevstudio-astro-dom-stamp-*.tgz
+          node -e "
+            const p = '@sudodevstudio/astro-dom-stamp';
+            for (const sub of ['', '/core', '/runtime', '/browser']) {
+              import(p + sub).then(() => console.log('ok', p + sub), (e) => { console.error(e); process.exit(1); });
+            }
+          "
