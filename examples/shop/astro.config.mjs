@@ -1,6 +1,8 @@
 import { defineConfig } from 'astro/config';
 import node from '@astrojs/node';
 import react from '@astrojs/react';
+import svelte from '@astrojs/svelte';
+import vue from '@astrojs/vue';
 import astroDomStamp from '@sudodevstudio/astro-dom-stamp';
 
 const editing = process.env.ASTRO_DOM_STAMP_EDIT === 'true';
@@ -15,6 +17,8 @@ export default defineConfig({
   },
   integrations: [
     react(),
+    vue(),
+    svelte(),
     astroDomStamp({
       read: ['id', 'uid', 'sku'],
       enabled: editing,

@@ -1,0 +1,23 @@
+---
+import Layout from '../layouts/Layout.astro';
+import VueRail from '../components/VueRail.vue';
+import SvelteFeed from '../components/SvelteFeed.svelte';
+import { listProducts } from '../lib/api.ts';
+
+// Nothing here is React. The stamper reads the DOM, so the framework only
+// decides when the DOM appears, not whether it can be stamped.
+const products = (await listProducts(Astro.url)).slice(0, 3);
+---
+<Layout title="Other frameworks">
+  <h1>Vue and Svelte</h1>
+
+  <section>
+    <h2>Vue island, hydrated with props</h2>
+    <VueRail products={products} client:load />
+  </section>
+
+  <section>
+    <h2>Svelte island, fetched in the browser</h2>
+    <SvelteFeed client:only="svelte" />
+  </section>
+</Layout>

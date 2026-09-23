@@ -43,11 +43,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench": "npm run build && node --experimental-strip-types bench/run.ts",
-    "size": "npm run build && node --experimental-strip-types bench/size.ts",
     "example": "npm run build && npm --workspace astro-dom-stamp-example-shop run dev:edit",
-    "verify": "npm run build && node probe/e2e/check.mjs && node probe/react/check.mjs && node probe/sfc/check.mjs && node examples/shop/check.mjs && node examples/shop/check-dev.mjs",
-    "probe:order": "cd probe/astro-order && astro build && cd ../sfc && ADS_ORDER=1 astro build"
+    "verify": "npm run build && node examples/shop/check.mjs && node examples/shop/check-dev.mjs"
   },
   "peerDependencies": {
     "astro": "^7.0.0"

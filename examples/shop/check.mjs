@@ -62,8 +62,13 @@ async function stampedOn(path) {
   const found = await page.evaluate(() =>
     [...document.querySelectorAll('[data-stamp-id]')].map((el) => el.getAttribute('data-stamp-id')),
   );
+  const cards = await page.evaluate(() => ({
+    all: document.querySelectorAll('.card').length,
+    vue: document.querySelectorAll('.vue-card[data-stamp-id]').length,
+    svelte: document.querySelectorAll('.svelte-card[data-stamp-id]').length,
+  }));
   await browser.close();
-  return { found, messages };
+  return { found, messages, cards };
 }
 
 build(true);
@@ -100,6 +105,21 @@ await withServer(async () => {
 
   const adminPage = await stampedOn('/admin/');
   check('an excluded path stamps nothing', adminPage.found.length === 0);
+
+  // Vue hydrates with props, Svelte renders only in the browser. The stamper
+  // reads the DOM, so the framework decides when it appears, not whether it
+  // can be stamped.
+  const frameworks = await stampedOn('/frameworks');
+  check('the Vue island is stamped after hydrating with props', frameworks.cards.vue === 3,
+    `${frameworks.cards.vue} of 3 cards`);
+  check('the Svelte island is stamped after its own browser fetch', frameworks.cards.svelte === 12,
+    `${frameworks.cards.svelte} of 12 cards`);
+  check('every card on the page is stamped',
+    frameworks.found.length === frameworks.cards.all,
+    `${frameworks.found.length} of ${frameworks.cards.all}`);
+  check('no framework complaint on the Vue and Svelte page',
+    frameworks.messages.filter((m) => /error|warn|hydrat/i.test(m)).length === 0,
+    frameworks.messages.slice(0, 2).join(' | '));
 });
 
 build(false);

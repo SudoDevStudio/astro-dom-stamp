@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import type { Product } from '../lib/data.ts';
+  import type { Product } from '../lib/catalog.ts';
 
   let products: Product[] = $state([]);
 
@@ -10,11 +10,11 @@
   });
 </script>
 
-<ul class="sveltefeed">
-  {#each products as p (p.id)}
-    <li class="sveltefeed-card">
-      <h3>{p.title}</h3>
-      <p>{p.blurb}</p>
+<ul class="grid">
+  {#each products as product (product.id)}
+    <li class="card svelte-card">
+      <h3>{product.title}</h3>
+      <p>{product.tagline}</p>
     </li>
   {/each}
 </ul>

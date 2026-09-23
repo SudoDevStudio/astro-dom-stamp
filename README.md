@@ -247,10 +247,37 @@ are skipped by default:
 When something slips through, the browser console names the attribute it landed
 in, which tells you what to add to `skipFields`.
 
+## Why it is built this way
+
+Three things in here look arbitrary until you know what was measured.
+
+**`.astro` needs no Astro parser.** Astro compiles `.astro` in a `load` hook,
+upstream of every `transform`, so the file reaches us as JavaScript at every
+plugin position including `enforce: 'pre'`. `oxc-parser` alone covers
+everything. Verified on Astro 7.3.3 with both a Node SSR build and a static one.
+
+**Vue and Svelte need a second pass.** They are the opposite: they compile in
+their own plugin's `transform`, so at `pre` their files are still SFC source
+that no JavaScript parser can read. They get a pass at `enforce: 'post'`, which
+runs after every normal-stage plugin no matter where `astroDomStamp()` sits in
+your `integrations` array. That pass is registered only when `@astrojs/vue` or
+`@astrojs/svelte` is present.
+
+**The marker starts with U+FEFF, not U+200B.** UAX #29 gives U+200C
+Grapheme_Cluster_Break=Extend and U+200D =ZWJ, so either would be pulled into
+the grapheme cluster of the last visible character. U+FEFF is =Control and
+breaks on both sides, which is why it leads and the joiners only appear deeper
+inside the run. Checked with `Intl.Segmenter` against Gurmukhi, Devanagari,
+Arabic and emoji ZWJ sequences.
+
+Re-check the first two after an Astro upgrade: both parsers are 0.x. You do not
+have to read anything to do it — if either assumption stops holding, the
+transform stops wrapping, the markers disappear, and
+[`examples/shop/check.mjs`](examples/shop/check.mjs) fails.
+
 ## Measured cost
 
-Node 22.22 on an Apple Silicon laptop. Reproduce with `npm run bench`,
-`npm run size` and `node --experimental-strip-types bench/scan.ts`.
+Measured on Node 22.22, Apple Silicon.
 
 | Where | Measurement | Target |
 | --- | --- | --- |
@@ -307,7 +334,9 @@ nothing. The browser console says so when `devWarnings` is on.
 ## Try it
 
 [`examples/shop`](examples/shop) is a small SSR site with a generated catalogue,
-its own API, React islands and an excluded `/admin/` path.
+its own API, React, Vue and Svelte islands, and an excluded `/admin/` path. It
+is also what CI runs: `npm run verify` builds it twice and drives a real
+browser over it, in build mode and under `astro dev`.
 
 ```sh
 npm install && npm run build && npm run example

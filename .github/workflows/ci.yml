@@ -35,8 +35,9 @@ jobs:
           cache: npm
       - run: npm ci --legacy-peer-deps
       - run: npx playwright install --with-deps chromium
-      # Builds real Astro projects and drives a real browser: this is what
-      # catches an Astro or parser upgrade changing where our transform sits.
+      # Builds the example twice and drives a real browser. This is what
+      # catches an Astro or parser upgrade changing where our transform sits:
+      # the transform would stop wrapping and the markers would disappear.
       - run: npm run verify
 
   package:

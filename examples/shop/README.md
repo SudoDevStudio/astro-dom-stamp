@@ -1,8 +1,9 @@
 # Example: a shop
 
-A small SSR Astro site to try `astro-dom-stamp` against. It has a generated
-catalogue, its own JSON API, a hand-rolled fetch client, React islands, and one
-path that is excluded from editing.
+A small SSR Astro site to try `astro-dom-stamp` against, and the repository's
+verification suite. It has a generated catalogue, its own JSON API, a
+hand-rolled fetch client, React, Vue and Svelte islands, and one path that is
+excluded from editing.
 
 ## Run it
 
@@ -31,6 +32,7 @@ dashed outline; the inspector shows `data-stamp-id`, `data-stamp-sku`.
 | --- | --- |
 | `/` | A server-rendered grid, a `client:load` island rendering **the same three products**, and a `client:only` island that fetches in the browser |
 | `/product/p0` | A single object, with nested variants and reviews that each get their own element. A product carries both keys, so it gets both attributes: `data-stamp-id="p0" data-stamp-sku="SKU-1000"`. A review has no sku, so it gets only `data-stamp-id` |
+| `/frameworks` | A Vue island hydrated with props and a Svelte island that fetches in the browser |
 | `/admin/` | A path in `excludeUrls`: same data, same helper, no markers and no stamping |
 
 `/` is the interesting one. The grid and the island render the same products
@@ -60,8 +62,8 @@ node examples/shop/check.mjs
 ```
 
 Builds twice, serves each build, and checks the HTML and a real browser: markers
-on the shop, none on `/admin/`, each rendering stamped separately, and a
-production build with nothing in it at all.
+on the shop, none on `/admin/`, each rendering stamped separately, Vue and
+Svelte islands stamped, and a production build with nothing in it at all.
 
 ```sh
 node examples/shop/check-dev.mjs

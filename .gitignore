@@ -143,17 +143,10 @@ vite.config.ts.timestamp-*
 .vite/
 
 kickoff.md
-# Probe build output
-probe/**/dist/
-probe/**/.astro/
-probe/**/probe-result.json
-probe/**/order-result.json
 
 # Build output
 dist/
 
-# Generated build-time benchmark project
-bench/build/project/
 
 # Astro generated types in the example
 examples/**/.astro/
