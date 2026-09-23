@@ -63,6 +63,13 @@ Builds twice, serves each build, and checks the HTML and a real browser: markers
 on the shop, none on `/admin/`, each rendering stamped separately, and a
 production build with nothing in it at all.
 
+```sh
+node examples/shop/check-dev.mjs
+```
+
+The same checks against `astro dev`, which serves modules one at a time through
+a different pipeline and hydrates islands later than a built server does.
+
 ## Copying this out of the repo
 
 Replace the `file:../..` dependency with the published package:

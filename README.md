@@ -27,7 +27,9 @@ Three pieces, all of which exist only in an edit build:
    markers travel with them, because they are just characters in a string.
 4. **Browser stamper.** It reads the markers back out of the DOM, works out
    which element each entity belongs to, writes the attributes, and keeps
-   watching for nodes that appear later.
+   watching for nodes that appear later. An island that has not hydrated yet is
+   left alone until it has, so no framework sees attributes appear underneath
+   it mid-hydration.
 
 A production build contains none of this. With `enabled: false` the integration
 registers no Vite plugin, no runtime import and no script, so the output is

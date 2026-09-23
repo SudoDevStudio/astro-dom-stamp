@@ -116,3 +116,35 @@ describe('charset', () => {
     expect(warnings.some((w) => w.includes('not UTF-8'))).toBe(true);
   });
 });
+
+describe('islands that have not hydrated', () => {
+  it('leaves a server-rendered island alone while it still carries ssr', async () => {
+    const p = server({ id: 'p1', title: 'Shoe' });
+    document.body.innerHTML = `<astro-island ssr><h1>${p.title}</h1></astro-island>`;
+    start();
+    await settle();
+    expect(document.querySelector('[data-stamp-id]')).toBeNull();
+  });
+
+  it('stamps it once the attribute goes, as hydration finishes', async () => {
+    const p = server({ id: 'p1', title: 'Shoe' });
+    document.body.innerHTML = `<astro-island ssr><h1>${p.title}</h1></astro-island>`;
+    start();
+    await settle();
+
+    document.querySelector('astro-island')!.removeAttribute('ssr');
+    await settle();
+    expect(document.querySelector('[data-stamp-id="p1"]')).not.toBeNull();
+  });
+
+  it('still stamps content outside the island', async () => {
+    const inside = server({ id: 'p1', title: 'Shoe' });
+    const outside = server({ id: 'p2', title: 'Boot' });
+    document.body.innerHTML =
+      `<astro-island ssr><h1>${inside.title}</h1></astro-island><h2>${outside.title}</h2>`;
+    start();
+    await settle();
+    expect(document.querySelector('[data-stamp-id="p2"]')).not.toBeNull();
+    expect(document.querySelector('[data-stamp-id="p1"]')).toBeNull();
+  });
+});

@@ -42,9 +42,15 @@ export function createStamper(config: StamperConfig): Stamper {
     const walker = document.createTreeWalker(body, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
       acceptNode(node) {
         if (node.nodeType === Node.ELEMENT_NODE) {
-          return SKIP_TAGS.has((node as Element).tagName)
-            ? NodeFilter.FILTER_REJECT
-            : NodeFilter.FILTER_ACCEPT;
+          const element = node as Element;
+          if (SKIP_TAGS.has(element.tagName)) return NodeFilter.FILTER_REJECT;
+          // An island still carrying `ssr` has not hydrated. Stamping its
+          // server-rendered DOM now makes React report a hydration mismatch,
+          // so leave it; the observer comes back when `ssr` is removed.
+          if (element.tagName === 'ASTRO-ISLAND' && element.hasAttribute('ssr')) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return NodeFilter.FILTER_ACCEPT;
         }
         return NodeFilter.FILTER_ACCEPT;
       },
@@ -107,7 +113,11 @@ export function createStamper(config: StamperConfig): Stamper {
     observer = new MutationObserver((records) => {
       if (applying) return;
       for (const record of records) {
-        if (record.type === 'characterData' || record.addedNodes.length > 0) {
+        if (
+          record.type === 'characterData' ||
+          record.type === 'attributes' ||
+          record.addedNodes.length > 0
+        ) {
           schedule();
           return;
         }
@@ -118,11 +128,15 @@ export function createStamper(config: StamperConfig): Stamper {
         requestAnimationFrame(begin);
         return;
       }
-      observer!.observe(document.body, { childList: true, subtree: true, characterData: true });
+      observer!.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+        // Hydration can leave the DOM untouched; losing `ssr` is the signal.
+        attributeFilter: ['ssr'],
+      });
       schedule();
     };
-    // Islands finish hydrating before `load`; scanning earlier would put
-    // attributes on nodes React is about to reconcile.
     if (document.readyState === 'complete') begin();
     else window.addEventListener('load', begin, { once: true });
     document.addEventListener('astro:page-load', schedule);
