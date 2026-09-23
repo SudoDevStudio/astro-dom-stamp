@@ -9,10 +9,11 @@ production.
 npm install @sudodevstudio/astro-dom-stamp
 ```
 
-> **Status: Phase 3.** Built, tested, and verified end to end through a real
+> **Status: Phase 5.** Built, tested, and verified end to end through a real
 > Astro SSR build and a real headless browser: server rendering, `client:load`
-> hydration, and `client:only` islands that fetch in the browser. Vue and
-> Svelte are not covered yet. See [Roadmap](#roadmap).
+> hydration, and `client:only` islands that fetch in the browser, for React,
+> Vue and Svelte. What remains is running it against a real site.
+> See [Roadmap](#roadmap).
 
 ## How it works
 
@@ -105,6 +106,11 @@ naming convention gets covered without listing every call:
 
 Files are matched by `include` / `exclude`, and a file with no fetch point is
 never parsed.
+
+`.astro`, `.ts`, `.js`, `.tsx` and `.jsx` are handled in one pass; `.vue` and
+`.svelte` need a second one, because their compilers run later than Astro's.
+That second pass is only registered when `@astrojs/vue` or `@astrojs/svelte` is
+in your config, so a project without them pays nothing for it.
 
 ### Finding out what to configure
 
@@ -202,7 +208,7 @@ Node 22.22 on an Apple Silicon laptop. Reproduce with `npm run bench`,
 | Where | Measurement | Target |
 | --- | --- | --- |
 | Production | nothing is included | 0 |
-| Build | **+6.9%** over 1000 modules that all contain a fetch point | < 10% |
+| Build | **+4.4%** over 1000 modules where 100 contain a fetch point; **+14%** if all 1000 do | < 10% |
 | Server | **~6.8 ms** to encode a 1000-product response (8001 objects, 32000 strings) | < 20 ms/request |
 | Browser | **~2.8 ms** first scan on a 806-element page; ~12 ms at 3206 elements | < 50 ms |
 | HTML | **~410 B raw per marker, ~12 B after gzip** | measure and decide |
@@ -247,7 +253,9 @@ nothing. The browser console says so when `devWarnings` is on.
 - **Another CMS's stega.** Markers coexist: ours uses a different prefix, and
   each decoder skips the other. Still simpler to turn the CMS's own stega off
   when you have your own editor.
-- **Vue and Svelte** are not covered yet.
+- **Build time on a worst-case codebase.** A file with no fetch point is never
+  parsed, so cost tracks how many files actually fetch. At one in ten it is
+  around 4%; if every file fetches it is around 14%, over the 10% budget.
 
 ## Roadmap
 
@@ -257,8 +265,9 @@ nothing. The browser console says so when `devWarnings` is on.
    verified end to end against a real Astro SSR build.
 3. ✅ **Phase 3** — React: `.tsx/.jsx`, browser-side fetch, hydrated islands,
    `client:only`, all verified in a real headless browser.
-4. **Phase 4** — preview deployment against real pages.
-5. **Phase 5** — Vue and Svelte.
+4. **Phase 4** — preview deployment against real pages. *This is the only step
+   left, and it needs your site rather than this repo.*
+5. ✅ **Phase 5** — Vue and Svelte, verified in a real headless browser.
 
 ## License
 

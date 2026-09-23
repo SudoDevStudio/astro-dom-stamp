@@ -8,6 +8,7 @@ function setupArgs() {
     injected,
     configs,
     args: {
+      config: { integrations: [] as Array<{ name: string }> },
       updateConfig: (config: unknown) => configs.push(config),
       injectScript: (_stage: string, code: string) => injected.push(code),
       logger: { info: vi.fn(), warn: vi.fn() },
@@ -40,7 +41,7 @@ describe('edit build', () => {
 
     const plugins = (configs[0] as { vite: { plugins: Array<{ name: string }> } }).vite.plugins;
     expect(plugins.map((p) => p.name)).toEqual([
-      'astro-dom-stamp:transform',
+      'astro-dom-stamp:transform-js',
       'astro-dom-stamp:runtime',
     ]);
   });
@@ -89,8 +90,8 @@ describe('build report', () => {
           plugins: Array<{ name: string; transform: { handler(code: string, id: string): unknown } }>;
         };
       }
-    ).vite.plugins.find((p) => p.name === 'astro-dom-stamp:transform')!;
-    for (const [id, code] of files) plugin.transform.handler(code, id);
+    ).vite.plugins.filter((p) => p.name.startsWith('astro-dom-stamp:transform'));
+    for (const [id, code] of files) for (const p of plugin) p.transform.handler(code, id);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (integration.hooks['astro:build:done'] as any)(args);
     return args.logger;
@@ -120,5 +121,28 @@ describe('build report', () => {
     const logger = runBuild(['client.*'], [['/p/src/lib/a.ts', 'const b = await client.query(Q);']]);
     const warnings = logger.warn.mock.calls.map((c) => String(c[0]));
     expect(warnings.some((w) => w.includes('no `.json()` call was wrapped'))).toBe(true);
+  });
+});
+
+describe('single-file component renderers', () => {
+  function pluginNames(integrations: Array<{ name: string }>): string[] {
+    const { args, configs } = setupArgs();
+    args.config.integrations = integrations;
+    const integration = astroDomStamp({ read: ['id'], enabled: true });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (integration.hooks['astro:config:setup'] as any)(args);
+    return (configs[0] as { vite: { plugins: Array<{ name: string }> } }).vite.plugins.map(
+      (p) => p.name,
+    );
+  }
+
+  it('adds no second pass to a project without Vue or Svelte', () => {
+    expect(pluginNames([{ name: '@astrojs/react' }])).not.toContain(
+      'astro-dom-stamp:transform-sfc',
+    );
+  });
+
+  it.each(['@astrojs/vue', '@astrojs/svelte'])('adds the second pass for %s', (name) => {
+    expect(pluginNames([{ name }])).toContain('astro-dom-stamp:transform-sfc');
   });
 });

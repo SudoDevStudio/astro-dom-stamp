@@ -36,7 +36,7 @@ export const DEFAULT_SKIP_FIELDS = [
   'url',
 ] as const;
 
-export const DEFAULT_INCLUDE = ['src/**/*.{astro,ts,js,mjs,tsx,jsx}'] as const;
+export const DEFAULT_INCLUDE = ['src/**/*.{astro,ts,js,mjs,tsx,jsx,vue,svelte}'] as const;
 export const DEFAULT_EXCLUDE = ['**/node_modules/**'] as const;
 
 export interface ResolvedOptions {

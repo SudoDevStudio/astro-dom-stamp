@@ -3,24 +3,36 @@ import { join } from 'node:path';
 
 const root = new URL('./project/', import.meta.url).pathname;
 const count = Number(process.argv[2] ?? 1000);
+// Share of modules that actually contain a fetch point. The rest are filtered
+// out by the code filter without ever reaching our JS handler.
+const ratio = Number(process.argv[3] ?? 1);
 
 rmSync(root, { recursive: true, force: true });
 mkdirSync(join(root, 'src/lib'), { recursive: true });
 mkdirSync(join(root, 'src/pages'), { recursive: true });
 
-// Every module carries a fetch point, so the transform has to parse all of them
-// -- the worst case for build time, not the average.
+let withFetch = 0;
 for (let i = 0; i < count; i++) {
+  const hasFetch = i % Math.max(1, Math.round(1 / ratio)) === 0;
+  if (hasFetch) withFetch++;
   writeFileSync(
     join(root, `src/lib/loader${i}.ts`),
-    [
-      `export interface Item${i} { id: string; title: string; blurb: string }`,
-      `export async function load${i}(): Promise<Item${i}[]> {`,
-      `  const res = await fetch('https://example.com/api/${i}');`,
-      `  return (await res.json()) as Item${i}[];`,
-      `}`,
-      '',
-    ].join('\n'),
+    hasFetch
+      ? [
+          `export interface Item${i} { id: string; title: string; blurb: string }`,
+          `export async function load${i}(): Promise<Item${i}[]> {`,
+          `  const res = await fetch('https://example.com/api/${i}');`,
+          `  return (await res.json()) as Item${i}[];`,
+          `}`,
+          '',
+        ].join('\n')
+      : [
+          `export interface Item${i} { id: string; title: string }`,
+          `export function load${i}(items: Item${i}[]): Item${i}[] {`,
+          `  return items.filter((item) => item.title.length > ${i % 7});`,
+          `}`,
+          '',
+        ].join('\n'),
   );
 }
 
@@ -60,4 +72,4 @@ writeFileSync(
   ].join('\n'),
 );
 
-console.log(`Generated ${count} loader modules in ${root}`);
+console.log(`Generated ${count} modules, ${withFetch} with a fetch point, in ${root}`);

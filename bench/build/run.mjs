@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { rmSync } from 'node:fs';
 
 const here = new URL('./project/', import.meta.url).pathname;
-const RUNS = 3;
+const RUNS = 5;
 
 function time(label, off) {
   const samples = [];

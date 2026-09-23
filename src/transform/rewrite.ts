@@ -44,7 +44,19 @@ const LANGS: Record<string, 'js' | 'jsx' | 'ts' | 'tsx'> = {
   mts: 'ts',
   tsx: 'tsx',
   astro: 'js',
+  // Reached only after their own compiler has run; parsed as TS because the
+  // output can still carry type annotations from a `lang="ts"` block.
+  vue: 'ts',
+  svelte: 'ts',
 };
+
+/** Single-file components, which reach us compiled rather than as source. */
+const SFC = new Set(['vue', 'svelte']);
+
+export function isSfc(id: string): boolean {
+  const extension = id.split('?')[0]!.split('.').pop()?.toLowerCase();
+  return extension !== undefined && SFC.has(extension);
+}
 
 export function langFor(id: string): 'js' | 'jsx' | 'ts' | 'tsx' | null {
   const extension = id.split('?')[0]!.split('.').pop()?.toLowerCase();
@@ -103,7 +115,7 @@ export function rewrite(id: string, code: string, options: RewriteOptions = {}):
 
   return {
     code: magic.toString(),
-    map: magic.generateMap({ source: id, includeContent: true, hires: true }),
+    map: magic.generateMap({ source: id, hires: false }),
     wrapped: pending.length,
     matched,
   };

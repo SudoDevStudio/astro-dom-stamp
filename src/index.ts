@@ -1,6 +1,11 @@
 import type { AstroIntegration } from 'astro';
 import { resolveOptions, type AstroDomStampOptions, type ResolvedOptions } from './core/options.js';
-import { createStats, createTransformPlugin, reportCoverage } from './transform/plugin.js';
+import {
+  createStats,
+  createTransformPlugins,
+  reportCoverage,
+  usesSfcRenderer,
+} from './transform/plugin.js';
 
 export type { AstroDomStampOptions, ResolvedOptions } from './core/options.js';
 export type { ListRef, Stamp } from './core/types.js';
@@ -28,11 +33,17 @@ export default function astroDomStamp(options: AstroDomStampOptions): AstroInteg
   return {
     name: NAME,
     hooks: {
-      'astro:config:setup': ({ updateConfig, injectScript, logger }) => {
-        logger.info('edit mode on: markers and the browser stamper are in this build.');
+      'astro:config:setup': ({ config, updateConfig, injectScript, logger }) => {
+        const withSfc = usesSfcRenderer(config.integrations);
+        logger.info(
+          `edit mode on: markers and the browser stamper are in this build${withSfc ? ', including .vue and .svelte' : ''}.`,
+        );
         updateConfig({
           vite: {
-            plugins: [createTransformPlugin(resolved, stats), runtimeModulePlugin(options, resolved)],
+            plugins: [
+              ...createTransformPlugins(resolved, stats, withSfc),
+              runtimeModulePlugin(options, resolved),
+            ],
           },
         });
         injectScript('page', stamperEntry(resolved));

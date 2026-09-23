@@ -118,3 +118,52 @@ the production build stamps nothing.
    preserves all four alphabet characters correctly once the charset is right.
    The stamper now warns when `document.characterSet` is not UTF-8, since
    nothing downstream can recover from it.
+
+## `sfc` — where do `.vue` and `.svelte` land, and do they hydrate cleanly?
+
+**Question (kickoff, Phase 5):** the `.astro` answer was that it reaches every
+`transform` hook already compiled. Vue and Svelte have their own compilers, so
+the same question has to be asked again — and the answer turns out to be the
+opposite.
+
+Run the ordering probe, which replaces the integration with three recording
+plugins:
+
+```sh
+cd probe/sfc && ADS_ORDER=1 npx astro build
+```
+
+**Result — Astro 7.3.3, @astrojs/vue 7.0.3 (Vue 3.5.43), @astrojs/svelte 9.0.1
+(Svelte 5.57.1):**
+
+| Plugin position | `.vue` and `.svelte` reach us as |
+| --- | --- |
+| `enforce: 'pre'` | raw SFC source (`<script setup>`, `<template>`) |
+| no `enforce` | compiled JavaScript |
+| `enforce: 'post'` | compiled JavaScript |
+
+Unlike Astro, these compile in their own plugin's `transform`, not in `load`.
+At `pre` there is nothing a JavaScript parser can read.
+
+**Conclusion:** two passes. `.astro`, `.ts`, `.tsx` and friends stay at
+`enforce: 'pre'`, the only position where `.ts` still holds the author's source.
+`.vue` and `.svelte` get a second pass at `enforce: 'post'`, which runs after
+every normal-stage plugin no matter what order integrations were registered in —
+relying on normal-stage ordering would depend on where the user put
+`astroDomStamp()` in their `integrations` array. That second pass is registered
+only when `@astrojs/vue` or `@astrojs/svelte` is in the config.
+
+Then the browser checks, against real Chromium:
+
+```sh
+npm run build && node probe/sfc/check.mjs
+```
+
+All fourteen pass: Vue and Svelte `client:load` islands are stamped after
+hydration, both `client:only` islands are stamped after their own browser fetch,
+neither framework logs a hydration warning, and the production build stamps
+nothing.
+
+**Note for anyone on TypeScript 7:** `@astrojs/svelte@9.0.1` still declares a
+peer range of `^5.3.3 || ^6.0.0`, so installing it alongside TypeScript 7 needs
+`--legacy-peer-deps`.

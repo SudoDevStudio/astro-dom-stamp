@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { langFor, rewrite } from '../src/transform/rewrite.ts';
+import { isSfc, langFor, rewrite } from '../src/transform/rewrite.ts';
 import { compileSources, mightMatch } from '../src/transform/sources.ts';
 import { ENCODE_LOCAL, ENCODE_RESULT_LOCAL, VIRTUAL_RUNTIME } from '../src/transform/names.ts';
 
@@ -138,8 +138,23 @@ describe('file selection', () => {
   });
 
   it('refuses a file type it cannot parse', () => {
-    expect(langFor('a.vue')).toBeNull();
     expect(langFor('a.css')).toBeNull();
+    expect(langFor('a.md')).toBeNull();
+  });
+
+  it('treats a compiled single-file component as TypeScript', () => {
+    expect(langFor('a.vue')).toBe('ts');
+    expect(langFor('a.svelte')).toBe('ts');
+  });
+
+  it.each([
+    ['a.vue', true],
+    ['a.svelte', true],
+    ['a.vue?vue&type=script', true],
+    ['a.astro', false],
+    ['a.tsx', false],
+  ])('knows %s is a single-file component: %s', (id, expected) => {
+    expect(isSfc(id)).toBe(expected);
   });
 
   it('pre-tests without parsing', () => {
