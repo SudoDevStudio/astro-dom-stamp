@@ -1,45 +1,17 @@
 # astro-dom-stamp
 
-Put `data-stamp-id`, `data-stamp-uid` and `data-stamp-sku` on the elements your
-fetched data renders into, so a custom visual editor knows what it is looking
-at — without touching a thousand templates by hand, and without costing anything
-in production.
+Puts `data-stamp-id` and friends on the elements your fetched data renders
+into, so a custom visual editor knows what it is looking at. No template edits,
+and nothing at all in a production build.
 
 ```sh
 npm install @sudodevstudio/astro-dom-stamp
 ```
 
-> **Status: Phase 5.** Built, tested, and verified end to end through a real
-> Astro SSR build and a real headless browser: server rendering, `client:load`
-> hydration, and `client:only` islands that fetch in the browser, for React,
-> Vue and Svelte. What remains is running it against a real site.
-> See [Roadmap](#roadmap).
-
-## How it works
-
-Three pieces, all of which exist only in an edit build:
-
-1. **Transform.** A Vite plugin wraps each fetch point in your `src/` — nothing
-   in your templates changes, and nothing on disk changes.
-2. **Encoder.** Every string in a fetch result gets an invisible marker
-   appended, carrying the id of the nearest object that has one.
-3. **SSR.** Those strings render into HTML and into hydrated island props. The
-   markers travel with them, because they are just characters in a string.
-4. **Browser stamper.** It reads the markers back out of the DOM, works out
-   which element each entity belongs to, writes the attributes, and keeps
-   watching for nodes that appear later. An island that has not hydrated yet is
-   left alone until it has, so no framework sees attributes appear underneath
-   it mid-hydration.
-
-A production build contains none of this. With `enabled: false` the integration
-registers no Vite plugin, no runtime import and no script, so the output is
-byte-identical to a build without the package installed.
-
 ## Setup
 
 ```js
 // astro.config.mjs
-import { defineConfig } from 'astro/config';
 import astroDomStamp from '@sudodevstudio/astro-dom-stamp';
 
 export default defineConfig({
@@ -57,13 +29,18 @@ ASTRO_DOM_STAMP_EDIT=true astro build   # editor preview
 astro build                             # production, zero cost
 ```
 
-This gating is **build time**, which assumes preview and production are separate
-builds. If one artifact is deployed to both, build-time gating cannot work —
-see [Limitations](#limitations).
+With `enabled: false` the integration registers nothing — no Vite plugin, no
+runtime import, no script — so the output is identical to a build without the
+package installed. This gating is **build time**, so preview and production have
+to be separate builds.
 
-## What gets wrapped
+## How it works
 
-Your source files are not edited. Only the code the edit build compiles changes:
+In an edit build, a Vite plugin wraps every `.json()` call in your `src/`. The
+encoder appends an invisible marker to each string in the result, carrying the
+id of the nearest object that has one. Those strings render into HTML and into
+island props, and a browser script reads the markers back out and writes the
+attributes.
 
 ```ts
 // your file, unchanged
@@ -73,127 +50,43 @@ const products = await (await fetch(API)).json();
 const products = await __encode((await fetch(API)).json());
 ```
 
-Every `.json()` call with no arguments is wrapped, wherever it sits:
+Every zero-argument `.json()` is wrapped wherever it sits — awaited, in a
+`.then()`, or returned. A hand-rolled client is covered automatically, because
+the wrap happens inside it.
 
-| Your code | Edit build |
-| --- | --- |
-| `await res.json()` | `await __encode(res.json())` |
-| `fetch(u).then((r) => r.json())` | `fetch(u).then((r) => __encode(r.json()))` |
-| `return res.json()` | `return __encode(res.json())` |
-
-There is one rule rather than one per shape, because `__encode` takes a promise
-as readily as a value. Anything else you fetch through goes in `sources`:
+Data that never passes through `fetch` needs naming:
 
 ```js
 astroDomStamp({
-  read: ['id', 'uid', 'sku'],
-  enabled: process.env.ASTRO_DOM_STAMP_EDIT === 'true',
-  sources: ['client.query', 'request', 'useQuery'],
+  read: ['id', 'sku'],
+  enabled: editing,
+  sources: ['client.query', 'api.get*', 'use*Query'],
 });
 ```
 
-Those are wrapped with `__encodeResult`, which copies rather than marking in
-place, because a cache entry or a hook result may be shared or frozen.
-
-A dotted name matches by its tail, so `client.query` also covers
-`this.client.query`. `*` stands for one path segment, which is how an in-house
-naming convention gets covered without listing every call:
-
-| Pattern | Matches | Does not match |
-| --- | --- | --- |
-| `client.*` | `client.query`, `client.fetchAll` | `client.a.b` |
-| `use*Query` | `useProductsQuery` | `useProductsQueryX` |
-| `api.get*` | `api.getProducts` | `api.setProducts` |
-| `*.query` | `anything.query` | `query` |
-
-Files are matched by `include` / `exclude`, and a file with no fetch point is
-never parsed.
-
-`.astro`, `.ts`, `.js`, `.tsx` and `.jsx` are handled in one pass; `.vue` and
-`.svelte` need a second one, because their compilers run later than Astro's.
-That second pass is only registered when `@astrojs/vue` or `@astrojs/svelte` is
-in your config, so a project without them pays nothing for it.
-
-### Finding out what to configure
-
-An edit build reports what it wrapped, so you do not have to guess:
-
-```
-[astro-dom-stamp] wrapped 143 data sources in 88 file(s)
-[astro-dom-stamp]   .json()  141
-[astro-dom-stamp]   client.*  2
-[WARN] [astro-dom-stamp] `sources` entry "http.get" matched no call in this build.
-```
-
-A `sources` entry that matched nothing is almost always a typo or a name that
-does not exist in your codebase. If nothing at all was wrapped, your data does
-not reach the page through `fetch`, and you need to name the call it does come
-from.
-
-If you need to encode something the transform cannot reach, do it yourself:
-
-```ts
-import { createEncoder } from '@sudodevstudio/astro-dom-stamp/runtime';
-
-const { __encode } = createEncoder({ read: ['id', 'uid', 'sku'] });
-const products = __encode(await db.products.findMany());
-```
+`*` matches one path segment. A dotted name also matches by its tail, so
+`client.query` covers `this.client.query`. Each build reports what it wrapped
+and warns about a `sources` entry that matched nothing.
 
 ## Where the attribute lands
 
-| Case | Element | Example |
-| --- | --- | --- |
-| Single object | Smallest element wrapping all of its text | `div.product` in `<div class="product"><h1>Shoe</h1><p>Soft</p></div>` |
-| Same entity rendered twice | Each rendering gets its own attribute | a hero and a sidebar card both stamped |
-| List, 2+ items rendered | Highest element covering only that item — the `.map()` element | each `<li>` or each card |
-| List, 1 item rendered | No container to find, so the single-object rule applies | `<h3>` in `<ul><li><h3>Shoe</h3></li></ul>` |
-| Nested entities | Each level takes its own element | product gets `<article>`, each variant its own `<li>` |
+| Case | Element |
+| --- | --- |
+| Single object | Smallest element wrapping all of its text |
+| List, 2+ items rendered | Highest element covering only that item — the `.map()` element |
+| List, 1 item rendered | No container to find, so the single-object rule applies |
+| Nested entities | Each level takes its own element |
+| Same entity rendered twice | Each rendering stamped separately |
 
-A grid with several cards per row still stops at the card, because the row
-covers more than one item.
-
-An object carrying several of the `read` keys gets one attribute each:
+An object gets one attribute per `read` key it actually carries:
 
 ```html
 <li class="card" data-stamp-id="p1" data-stamp-sku="SKU-1001">…</li>
 ```
 
-The value goes in the attribute value, not the name — unlike Astro's own
-`data-astro-cid-ju4pidww`, where the identifier is part of the name.
-
-The `data-stamp-` prefix is there because plain `data-id` is common in real
-markup, and an attribute already in your markup is never overwritten — a
-collision would mean that element silently never gets stamped. Set
-`attributePrefix: 'data-'` if your editor needs the short form.
-
-Two entities resolving to the same element: the first wins, and the second is
-reported in the console.
-
-## Turning it off for some paths
-
-An admin screen or a checkout flow usually wants none of this — not the
-attributes, and especially not the markers, since those are what can upset
-string logic.
-
-```js
-astroDomStamp({
-  read: ['id', 'uid', 'sku'],
-  enabled: process.env.ASTRO_DOM_STAMP_EDIT === 'true',
-  excludeUrls: ['/admin/*', '/checkout/*'],
-});
-```
-
-This works on both ends. The browser script does nothing on those paths, and the
-server does not encode for them either: the integration adds a middleware that
-scopes the decision to the request, so a shared fetch helper returns plain data
-when the page asking for it is excluded, and marked data everywhere else. An
-excluded page behaves exactly as it does in production.
-
-`*` matches any characters including `/`, and a pattern ending in `/*` also
-matches the path without the trailing slash — `/admin/*` covers `/admin`,
-`/admin/` and `/admin/users/42`.
-
-The middleware is only registered when `excludeUrls` is non-empty.
+Two entities landing on one element: the first wins, and the second is reported
+in the console. An attribute already in your markup is never overwritten — which
+is why the prefix is namespaced rather than a bare `data-id`.
 
 ## Reading data back
 
@@ -203,156 +96,70 @@ displaying it needs them gone first:
 ```ts
 import { clean, cleanString } from '@sudodevstudio/astro-dom-stamp/core';
 
-if (cleanString(product.status) === 'sold') { /* ... */ }
-const payload = clean(product);        // deep, for comparisons or an API call
+if (cleanString(product.status) === 'sold') { /* … */ }
 ```
 
-Import these from `/core`, not from the package root. The root is the
-integration and reaches the build-time transform, which carries a Rust parser —
-a client component importing from it pulls all of that into the browser bundle.
+Import these from `/core`, not the package root. The root is the integration and
+reaches the build-time transform, which carries a Rust parser.
 
-`clean()` removes only our markers. Another CMS's stega on the same string is
-left exactly where it was.
+`clean()` removes only our markers; another CMS's stega is left alone.
 
 ## Options
 
 | Option | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `read` | `string[]` | **required** | Keys that become attributes. `id` → `data-stamp-id`, `productId` → `data-stamp-product-id`. Every listed key the object carries gets its own attribute. |
-| `attributePrefix` | `string` | `data-stamp-` | Prefix for those attributes. Must start with `data-`. |
-| `enabled` | `boolean` | `false` | `true` for the edit build. `false` registers nothing at all. |
-| `sources` | `string[]` | `[]` | Extra call expressions to wrap, e.g. `client.query`, `useQuery`, `api.*`. `*` matches one path segment. |
-| `skipFields` | `string[]` | see below | Extra keys whose values are never marked. |
-| `include` | `string[]` | `src/**/*.{astro,ts,js,mjs,tsx,jsx}` | Files the transform covers. A project-relative glob is anchored for you, since Vite passes absolute ids. |
-| `exclude` | `string[]` | `**/node_modules/**` | Files it skips. |
-| `excludeUrls` | `string[]` | `[]` | Paths where nothing happens at all. `*` matches any characters, so `/admin/*` covers `/admin` and everything under it. |
-| `stripAfterStamp` | `boolean` | `false` | Remove markers from the text once the attribute is on. |
+| `read` | `string[]` | **required** | Keys that become attributes. `productId` → `data-stamp-product-id`. |
+| `enabled` | `boolean` | `false` | `true` for the edit build. `false` registers nothing. |
+| `sources` | `string[]` | `[]` | Extra calls to wrap. `*` matches one path segment. |
+| `skipFields` | `string[]` | see below | Extra keys never encoded. |
+| `excludeUrls` | `string[]` | `[]` | Paths where nothing happens at all, e.g. `['/admin/*']`. |
+| `attributePrefix` | `string` | `data-stamp-` | Must start with `data-`. |
+| `include` / `exclude` | `string[]` | `src/**`, not `node_modules` | Files the transform covers. |
+| `stripAfterStamp` | `boolean` | `false` | Remove markers from the text once stamped. |
 | `devWarnings` | `boolean` | `true` | Warn about collisions and markers in unsafe places. |
 
-### What is never marked
+`excludeUrls` works on both ends: the browser script does nothing on those
+paths, and a middleware scopes the decision to the request so the server does
+not encode for them either. A shared fetch helper returns plain data when the
+page asking for it is excluded.
 
-A marker inside a string that gets compared, parsed, sliced or used as a URL is
-the main way edit mode can break a page that production renders fine. So these
-are skipped by default:
+**Never encoded by default:** URLs and dates; keys starting with `_`, ending in
+`Id`, or containing `type`; `class`, `color`, `email`, `hex`, `href`, `icon`,
+`path`, `slug`, `url` (matched on the whole key or its last word, so `imageUrl`
+counts); anything under `meta`, `metadata`, `openGraph`, `seo`; and your own
+`read` keys.
 
-- URLs (`http`, `https`, `mailto`, `tel`, protocol-relative) and dates
-- Keys starting with `_`, keys ending in `Id`, keys containing `type`
-- `class`, `classname`, `color`, `email`, `hex`, `href`, `icon`, `path`,
-  `slug`, `url` — matched on the whole key or its last word, so `imageUrl` and
-  `bgColor` are covered
-- Everything under `meta`, `metadata`, `openGraph` and `seo`
-- Your own `read` keys, since ids end up in URLs and comparisons
-- Empty and whitespace-only strings
+## Things that will bite you
 
-When something slips through, the browser console names the attribute it landed
-in, which tells you what to add to `skipFields`.
+- **The page must declare UTF-8.** A page decoded as windows-1252 turns every
+  marker into mojibake before any of this runs. Any normal Astro page already
+  has `<meta charset="utf-8">`; without it, edit mode silently stamps nothing.
+  The console says so when `devWarnings` is on.
+- **String logic breaks in edit mode.** Comparisons, `slice`, `.length`, class
+  names built from CMS fields. That is what `clean()`, the skip rules and
+  `excludeUrls` are for. Production is unaffected — there are no markers there.
+- **Strings only.** An item rendered purely as a number, or an image with no
+  `alt`, carries no marker and gets no attribute.
+- **Build cost tracks how many files fetch.** A file with no fetch point is
+  never parsed. Around 4% when one file in ten fetches; around 14% if every
+  file does.
+- **Vue and Svelte** need `@astrojs/vue` or `@astrojs/svelte` present, which
+  adds a second transform pass.
 
-## Why it is built this way
+## Cost
 
-Three things in here look arbitrary until you know what was measured.
-
-**`.astro` needs no Astro parser.** Astro compiles `.astro` in a `load` hook,
-upstream of every `transform`, so the file reaches us as JavaScript at every
-plugin position including `enforce: 'pre'`. `oxc-parser` alone covers
-everything. Verified on Astro 7.3.3 with both a Node SSR build and a static one.
-
-**Vue and Svelte need a second pass.** They are the opposite: they compile in
-their own plugin's `transform`, so at `pre` their files are still SFC source
-that no JavaScript parser can read. They get a pass at `enforce: 'post'`, which
-runs after every normal-stage plugin no matter where `astroDomStamp()` sits in
-your `integrations` array. That pass is registered only when `@astrojs/vue` or
-`@astrojs/svelte` is present.
-
-**The marker starts with U+FEFF, not U+200B.** UAX #29 gives U+200C
-Grapheme_Cluster_Break=Extend and U+200D =ZWJ, so either would be pulled into
-the grapheme cluster of the last visible character. U+FEFF is =Control and
-breaks on both sides, which is why it leads and the joiners only appear deeper
-inside the run. Checked with `Intl.Segmenter` against Gurmukhi, Devanagari,
-Arabic and emoji ZWJ sequences.
-
-Re-check the first two after an Astro upgrade: both parsers are 0.x. You do not
-have to read anything to do it — if either assumption stops holding, the
-transform stops wrapping, the markers disappear, and
-[`examples/shop/check.mjs`](examples/shop/check.mjs) fails.
-
-## Measured cost
-
-Measured on Node 22.22, Apple Silicon.
-
-| Where | Measurement | Target |
-| --- | --- | --- |
-| Production | nothing is included | 0 |
-| Build | **+4.4%** over 1000 modules where 100 contain a fetch point; **+14%** if all 1000 do | < 10% |
-| Server | **~6.8 ms** to encode a 1000-product response (8001 objects, 32000 strings) | < 20 ms/request |
-| Browser | **~2.8 ms** first scan on a 806-element page; ~12 ms at 3206 elements | < 50 ms |
-| HTML | **~410 B raw per marker, ~12 B after gzip** | measure and decide |
-| `clean()` | ~22 ms over a whole 1000-product response | — |
-
-The HTML figure is the one to watch. Raw growth is large — markers are 12 bytes
-of UTF-8 per payload byte — but around 97% of it compresses away, because a
-marker is a run of only four distinct characters. Budget by marker count: a page
-with 500 marked strings costs roughly 6 KB gzipped.
-
-Browser numbers come from jsdom, which is slower than a real engine, so treat
-them as an upper bound. Scan time grows linearly with element count.
-
-Each marker also carries the ordinal of the string it was attached to, which is
-what lets the browser tell two renderings of one entity apart. It costs about
-13% more bytes per marker; on the server it costs nothing measurable, because
-the entity part of a marker is encoded once per object and reused.
-
-## Requirements
-
-**The page must declare UTF-8.** Markers are zero-width characters; a page
-decoded as windows-1252 turns every one of them into mojibake before any of this
-code runs, and nothing downstream can recover. Any normal Astro page already has
-`<meta charset="utf-8">` in its head — but if yours does not, or your server
-sends `Content-Type: text/html` with no charset, edit mode silently stamps
-nothing. The browser console says so when `devWarnings` is on.
-
-## Limitations
-
-- **Strings only.** An item rendered purely as a number or an image with no
-  `alt` carries no marker and gets no attribute.
-- **String logic breaks in edit mode.** Comparisons, lookups, `slice`,
-  `.length`, and class names built from CMS fields. The skip rules, `clean()`
-  and the console warnings exist to manage this. Production is unaffected —
-  there are no markers there at all.
-- **One build for both deployments.** Build-time gating assumes preview and
-  production are built separately. If a single artifact serves both and only the
-  runtime environment differs, this approach cannot give you a zero-cost
-  production path.
-- **Coverage.** Data that does not come from `.json()` or a configured source —
-  a database driver, some SDKs — is not reached.
-- **Another CMS's stega.** Markers coexist: ours uses a different prefix, and
-  each decoder skips the other. Still simpler to turn the CMS's own stega off
-  when you have your own editor.
-- **Build time on a worst-case codebase.** A file with no fetch point is never
-  parsed, so cost tracks how many files actually fetch. At one in ten it is
-  around 4%; if every file fetches it is around 14%, over the 10% budget.
+Nothing in production. In edit mode, measured on Node 22.22: about 7 ms to
+encode a 1000-product response, about 3 ms for the first browser scan of an
+800-element page, and about 12 bytes of gzipped HTML per marker.
 
 ## Try it
 
-[`examples/shop`](examples/shop) is a small SSR site with a generated catalogue,
-its own API, React, Vue and Svelte islands, and an excluded `/admin/` path. It
-is also what CI runs: `npm run verify` builds it twice and drives a real
-browser over it, in build mode and under `astro dev`.
+[`examples/shop`](examples/shop) is a small SSR site with React, Vue and Svelte
+islands and an excluded `/admin/` path.
 
 ```sh
-npm install && npm run build && npm run example
+npm install && npm run example
 ```
-
-## Roadmap
-
-1. ✅ **Phase 1** — encoder, stamper, `clean()`, tests, benchmarks; Astro plugin
-   order, Gurmukhi and emoji rendering, and gzipped HTML size all verified.
-2. ✅ **Phase 2** — build-time transform for `.astro` and `.ts/.js` helpers,
-   verified end to end against a real Astro SSR build.
-3. ✅ **Phase 3** — React: `.tsx/.jsx`, browser-side fetch, hydrated islands,
-   `client:only`, all verified in a real headless browser.
-4. **Phase 4** — preview deployment against real pages. *This is the only step
-   left, and it needs your site rather than this repo.*
-5. ✅ **Phase 5** — Vue and Svelte, verified in a real headless browser.
 
 ## License
 
