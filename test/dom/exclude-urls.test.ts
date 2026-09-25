@@ -12,6 +12,7 @@ function run(path: string, excludeUrls: string[], { immediate = false } = {}) {
   const resolved = resolveOptions({ read: ['id', 'uid', 'sku'], devWarnings: false, excludeUrls });
   running = createStamper({
     attributes: resolved.attributes,
+    fieldAttribute: resolved.fieldAttribute,
     stripAfterStamp: resolved.stripAfterStamp,
     devWarnings: resolved.devWarnings,
     excludeUrls: resolved.excludeUrls,

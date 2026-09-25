@@ -48,7 +48,7 @@ export function encode<T>(value: T, settings: EncodeSettings): T {
     copy: false,
     seen: new WeakSet(),
   };
-  return walk(value, state, null, undefined, false, 0) as T;
+  return walk(value, state, null, undefined, false, 0, '') as T;
 }
 
 /**
@@ -65,7 +65,7 @@ export function encodeResult<T>(value: T, settings: EncodeSettings): T {
     copy: true,
     seen: new WeakSet(),
   };
-  const result = walk(value, state, null, undefined, false, 0) as T;
+  const result = walk(value, state, null, undefined, false, 0, '') as T;
   copies.set(value as object, result);
   return result;
 }
@@ -87,17 +87,21 @@ function walk(
   slot: ListSlot | undefined,
   opaque: boolean,
   depth: number,
+  prefix: string,
 ): unknown {
-  if (Array.isArray(value)) return walkArray(value, state, owner, opaque, depth);
-  if (isPlainObject(value)) return walkObject(value, state, owner, slot, opaque, depth);
+  if (Array.isArray(value)) return walkArray(value, state, owner, opaque, depth, prefix);
+  if (isPlainObject(value)) return walkObject(value, state, owner, slot, opaque, depth, prefix);
   return value;
 }
 
 interface OwnerMarker {
   stamp: Stamp;
-  build: (field: number) => string;
-  /** Next field ordinal. Strings are numbered per owner, in property order. */
-  next: number;
+  build: (field: string) => string;
+}
+
+/** `title`, or `details.color` when the value sits below its owner. */
+function joinPath(prefix: string, key: string | number): string {
+  return prefix === '' ? String(key) : `${prefix}.${key}`;
 }
 
 function walkObject(
@@ -107,6 +111,7 @@ function walkObject(
   slot: ListSlot | undefined,
   opaque: boolean,
   depth: number,
+  prefix: string,
 ): unknown {
   if (depth > MAX_DEPTH) return node;
   if (state.copy) {
@@ -122,8 +127,10 @@ function walkObject(
   if (fields !== null) {
     const stamp: Stamp = { fields };
     if (slot) stamp.list = { ref: (slot.box.ref ??= nextListRef()), index: slot.index };
-    current = { stamp, build: markerBuilder(serializeEntity(stamp)), next: 0 };
+    current = { stamp, build: markerBuilder(serializeEntity(stamp)) };
   }
+  // A new owner restarts the path; otherwise values keep the incoming one.
+  const base = fields !== null ? '' : prefix;
 
   const target = state.copy ? ({} as Record<string, unknown>) : node;
   if (state.copy) copies.set(node, target);
@@ -135,10 +142,7 @@ function walkObject(
     if (typeof value === 'string') {
       let next = value;
       if (current !== null && !opaque && !shouldSkipKey(key, state.skip) && !shouldSkipValue(value)) {
-        // The ordinal is consumed whether or not a marker is appended, so a
-        // response encoded twice numbers its fields the same way both times.
-        const field = current.next++;
-        if (!alreadyOwned(value, current)) next = value + current.build(field);
+        if (!alreadyOwned(value, current)) next = value + current.build(joinPath(base, key));
       }
       if (next !== value && !state.copy) {
         frozen ??= Object.isFrozen(node);
@@ -150,7 +154,7 @@ function walkObject(
 
     if (value !== null && typeof value === 'object') {
       const childOpaque = opaque || isOpaqueParent(key);
-      const walked = walk(value, state, current, undefined, childOpaque, depth + 1);
+      const walked = walk(value, state, current, undefined, childOpaque, depth + 1, joinPath(base, key));
       if (state.copy) target[key] = walked;
       continue;
     }
@@ -167,6 +171,7 @@ function walkArray(
   owner: OwnerMarker | null,
   opaque: boolean,
   depth: number,
+  prefix: string,
 ): unknown {
   if (depth > MAX_DEPTH) return node;
   if (state.copy) {
@@ -189,8 +194,7 @@ function walkArray(
     if (typeof value === 'string') {
       let next = value;
       if (owner !== null && !opaque && !shouldSkipValue(value)) {
-        const field = owner.next++;
-        if (!alreadyOwned(value, owner)) next = value + owner.build(field);
+        if (!alreadyOwned(value, owner)) next = value + owner.build(joinPath(prefix, i));
       }
       if (next !== value && !state.copy) {
         frozen ??= Object.isFrozen(node);
@@ -201,7 +205,7 @@ function walkArray(
     }
 
     if (value !== null && typeof value === 'object') {
-      const walked = walk(value, state, owner, { box, index: i }, opaque, depth + 1);
+      const walked = walk(value, state, owner, { box, index: i }, opaque, depth + 1, joinPath(prefix, i));
       if (state.copy) target[i] = walked;
       continue;
     }

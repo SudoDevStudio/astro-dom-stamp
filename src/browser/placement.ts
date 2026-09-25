@@ -80,7 +80,7 @@ export function resolvePlacements(occurrences: Occurrence[]): Placement[] {
 function splitRenderings(occurrences: Occurrence[]): Element[][] {
   const renderings: Element[][] = [];
   let current: Element[] = [];
-  let seen = new Set<number>();
+  let seen = new Set<string>();
 
   for (const occurrence of occurrences) {
     const field = occurrence.stamp.field;

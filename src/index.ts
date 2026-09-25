@@ -113,6 +113,7 @@ function middlewareModule(resolved: ResolvedOptions): string {
 function stamperEntry(resolved: ResolvedOptions): string {
   const config = JSON.stringify({
     attributes: resolved.attributes,
+    fieldAttribute: resolved.fieldAttribute,
     stripAfterStamp: resolved.stripAfterStamp,
     devWarnings: resolved.devWarnings,
     excludeUrls: resolved.excludeUrls,

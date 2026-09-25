@@ -54,9 +54,14 @@ export const DEFAULT_EXCLUDE = ['**/node_modules/**'] as const;
 
 export const DEFAULT_ATTRIBUTE_PREFIX = 'data-stamp-';
 
+/** Suffix of the attribute naming which field an element renders. */
+export const FIELD_ATTRIBUTE = 'field';
+
 export interface ResolvedOptions {
   read: string[];
   attributePrefix: string;
+  /** Attribute naming the field, e.g. `data-stamp-field`. */
+  fieldAttribute: string;
   attributes: Record<string, string>;
   enabled: boolean;
   sources: string[];
@@ -97,11 +102,20 @@ export function resolveOptions(options: AstroDomStampOptions): ResolvedOptions {
   }
 
   const attributes: Record<string, string> = {};
-  for (const key of read) attributes[key] = `${attributePrefix}${kebabCase(key)}`;
+  for (const key of read) {
+    const attribute = `${attributePrefix}${kebabCase(key)}`;
+    if (attribute === `${attributePrefix}${FIELD_ATTRIBUTE}`) {
+      throw new Error(
+        `[astro-dom-stamp] read key "${key}" collides with the field attribute "${attribute}".`,
+      );
+    }
+    attributes[key] = attribute;
+  }
 
   return {
     read: [...read],
     attributePrefix,
+    fieldAttribute: `${attributePrefix}${FIELD_ATTRIBUTE}`,
     attributes,
     enabled: options.enabled ?? false,
     sources: [...(options.sources ?? [])],
@@ -118,7 +132,9 @@ export function kebabCase(key: string): string {
   return key
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .replace(/[_\s]+/g, '-')
-    .toLowerCase();
+    .toLowerCase()
+    // A conventional `_type` would otherwise give `data-stamp--type`.
+    .replace(/^-+|-+$/g, '');
 }
 
 // Vite passes absolute ids, so a project-relative glob like `src/**/*.ts` would

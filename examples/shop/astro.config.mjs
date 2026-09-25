@@ -20,7 +20,9 @@ export default defineConfig({
     vue(),
     svelte(),
     astroDomStamp({
-      read: ['id', 'uid', 'sku'],
+      // `_type` becomes data-stamp-type, so an editor knows which
+      // collection an element belongs to.
+      read: ['_type', 'id', 'sku'],
       enabled: editing,
       // Nothing runs on these paths: no markers in the response, no scanning.
       excludeUrls: ['/admin/*'],

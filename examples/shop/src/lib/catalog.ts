@@ -1,4 +1,5 @@
 export interface Review {
+  _type: 'review';
   id: string;
   author: string;
   body: string;
@@ -6,6 +7,7 @@ export interface Review {
 }
 
 export interface Variant {
+  _type: 'variant';
   id: string;
   sku: string;
   label: string;
@@ -14,6 +16,7 @@ export interface Variant {
 }
 
 export interface Product {
+  _type: 'product';
   id: string;
   sku: string;
   title: string;
@@ -64,6 +67,7 @@ export function makeProduct(index: number): Product {
   const price = 40 + Math.floor(random() * 160);
 
   return {
+    _type: 'product' as const,
     id: `p${index}`,
     sku: `SKU-${1000 + index}`,
     title,
@@ -77,6 +81,7 @@ export function makeProduct(index: number): Product {
     category: pick(CATEGORIES, random),
     publishedAt: new Date(Date.UTC(2026, index % 12, (index % 27) + 1)).toISOString(),
     variants: Array.from({ length: 2 + Math.floor(random() * 2) }, (_, v) => ({
+      _type: 'variant' as const,
       id: `p${index}v${v}`,
       sku: `SKU-${1000 + index}-${v}`,
       label: `${pick(COLOURS, random)} / ${pick(SIZES, random)}`,
@@ -84,6 +89,7 @@ export function makeProduct(index: number): Product {
       priceLabel: `€${price + v * 5}`,
     })),
     reviews: Array.from({ length: 1 + Math.floor(random() * 3) }, (_, r) => ({
+      _type: 'review' as const,
       id: `p${index}r${r}`,
       author: pick(NAMES, random),
       body: pick(PRAISE, random),

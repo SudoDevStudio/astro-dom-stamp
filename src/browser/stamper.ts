@@ -6,6 +6,8 @@ import { resolvePlacements, type Occurrence } from './placement.js';
 
 export interface StamperConfig {
   attributes: Record<string, string>;
+  /** Attribute naming which field an element renders, e.g. `data-stamp-field`. */
+  fieldAttribute: string;
   stripAfterStamp: boolean;
   devWarnings: boolean;
   /** Path patterns where the stamper does nothing at all. */
@@ -80,6 +82,7 @@ export function createStamper(config: StamperConfig): Stamper {
     applying = true;
     try {
       apply(resolvePlacements(occurrences), config, warnedKeys);
+      writeFields(occurrences, config, warnedKeys);
       if (config.stripAfterStamp) {
         for (const text of markedText) text.data = stripMarkers(text.data);
         for (const element of markedAlt) {
@@ -183,6 +186,47 @@ function apply(
     }
     claimed.set(placement.target, placement.key);
     writeAttributes(placement.target, placement.stamp, config);
+  }
+}
+
+/**
+ * The entity attributes go on the element wrapping all of its text; this puts
+ * the field on the element rendering that one value, and repeats the entity
+ * there so one element is enough to build an edit call from.
+ */
+function writeFields(
+  occurrences: Occurrence[],
+  config: StamperConfig,
+  warnedKeys: Set<string>,
+): void {
+  const claimed = new Map<Element, string>();
+  for (const occurrence of occurrences) {
+    const field = occurrence.stamp.field;
+    if (field === undefined) continue;
+
+    // Same rule as an entity target: neither is a sensible editing surface.
+    const tag = occurrence.element.tagName;
+    if (tag === 'BODY' || tag === 'HTML') continue;
+
+    const owner = claimed.get(occurrence.element);
+    const claim = `${occurrence.key}|${field}`;
+    if (owner !== undefined) {
+      if (owner !== claim && config.devWarnings) {
+        warnOnce(warnedKeys, `field:${owner}:${claim}`, () =>
+          console.warn(
+            `${LOG_PREFIX} two fields render into the same element; keeping the first.`,
+            { element: occurrence.element, kept: owner, dropped: claim },
+          ),
+        );
+      }
+      continue;
+    }
+    claimed.set(occurrence.element, claim);
+
+    if (!occurrence.element.hasAttribute(config.fieldAttribute)) {
+      occurrence.element.setAttribute(config.fieldAttribute, field);
+    }
+    writeAttributes(occurrence.element, occurrence.stamp, config);
   }
 }
 

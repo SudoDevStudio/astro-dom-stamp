@@ -6,6 +6,6 @@ export interface ListRef {
 export interface Stamp {
   fields: Record<string, string>;
   list?: ListRef;
-  /** Which of the owner's strings this marker came from, counted per owner. */
-  field?: number;
+  /** Which of the owner's values this came from, as a path: `title`, `tags.0`. */
+  field?: string;
 }

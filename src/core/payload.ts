@@ -30,8 +30,8 @@ export function serializeEntity(stamp: Stamp): string {
   return out;
 }
 
-export function fieldSuffix(field: number): string {
-  return `|${FIELD_KEY}=${field.toString(36)}`;
+export function fieldSuffix(field: string): string {
+  return `|${FIELD_KEY}=${escape(field)}`;
 }
 
 export function serializeStamp(stamp: Stamp): string {
@@ -45,7 +45,7 @@ export function parseStamp(payload: string): Stamp | null {
 
   const fields: Record<string, string> = {};
   let list: ListRef | undefined;
-  let field: number | undefined;
+  let field: string | undefined;
 
   for (let i = 1; i < parts.length; i++) {
     const pair = splitRaw(parts[i]!, '=', 2);
@@ -59,9 +59,8 @@ export function parseStamp(payload: string): Stamp | null {
       if (!Number.isInteger(index) || index < 0) return null;
       list = { ref: value.slice(0, at), index };
     } else if (key === FIELD_KEY) {
-      const parsed = Number.parseInt(value, 36);
-      if (!Number.isInteger(parsed) || parsed < 0) return null;
-      field = parsed;
+      if (value.length === 0) return null;
+      field = value;
     } else {
       fields[key] = value;
     }

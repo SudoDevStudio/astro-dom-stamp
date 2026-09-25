@@ -248,30 +248,39 @@ describe('data encoded twice', () => {
   });
 });
 
-describe('field ordinals', () => {
-  it('numbers each owner\'s strings from zero', () => {
+describe('field paths', () => {
+  it('names each value by its key', () => {
     const data = encode({ id: '5', title: 'Shoe', blurb: 'Soft' }, defaultSettings);
-    expect(stampOf(data.title)?.field).toBe(0);
-    expect(stampOf(data.blurb)?.field).toBe(1);
+    expect(stampOf(data.title)?.field).toBe('title');
+    expect(stampOf(data.blurb)?.field).toBe('blurb');
   });
 
-  it('restarts numbering for a nested owner', () => {
+  it('restarts the path at a nested owner', () => {
     const data = encode(
       { id: 'p', title: 'Shoe', variant: { id: 'v', label: 'Red', note: 'New' } },
       defaultSettings,
     );
-    expect(stampOf(data.title)?.field).toBe(0);
-    expect(stampOf(data.variant.label)?.field).toBe(0);
-    expect(stampOf(data.variant.note)?.field).toBe(1);
+    expect(stampOf(data.title)?.field).toBe('title');
+    expect(stampOf(data.variant.label)?.field).toBe('label');
+    expect(stampOf(data.variant.note)?.field).toBe('note');
   });
 
-  it('numbers items of a string array', () => {
+  it('keeps the path when a nested object has no id of its own', () => {
+    const data = encode(
+      { id: 'p', details: { fabric: 'Suede', care: { note: 'Wipe clean' } } },
+      defaultSettings,
+    );
+    expect(stampOf(data.details.fabric)?.field).toBe('details.fabric');
+    expect(stampOf(data.details.care.note)?.field).toBe('details.care.note');
+  });
+
+  it('indexes items of a string array', () => {
     const data = encode({ id: '5', tags: ['Warm', 'Winter'] }, defaultSettings);
-    expect(stampOf(data.tags[0]!)?.field).toBe(0);
-    expect(stampOf(data.tags[1]!)?.field).toBe(1);
+    expect(stampOf(data.tags[0]!)?.field).toBe('tags.0');
+    expect(stampOf(data.tags[1]!)?.field).toBe('tags.1');
   });
 
-  it('gives two items of one list the same ordinals', () => {
+  it('gives two items of one list the same field names', () => {
     const data = encode(
       [
         { id: 'a', title: 'One', blurb: 'x' },
@@ -279,8 +288,9 @@ describe('field ordinals', () => {
       ],
       defaultSettings,
     );
-    expect(stampOf(data[0]!.title)?.field).toBe(stampOf(data[1]!.title)?.field);
-    expect(stampOf(data[0]!.blurb)?.field).toBe(1);
+    expect(stampOf(data[0]!.title)?.field).toBe('title');
+    expect(stampOf(data[1]!.title)?.field).toBe('title');
+    expect(stampOf(data[0]!.blurb)?.field).toBe('blurb');
   });
 
   it('keeps ordinals stable when a response is encoded twice', () => {

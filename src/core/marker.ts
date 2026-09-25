@@ -26,7 +26,8 @@ export interface FoundMarker {
 // Both of these are looked up once per marked string, so they are memoised
 // rather than re-encoded. Without this the field ordinal doubles encode time.
 const headerCache: string[] = [];
-const suffixCache: Array<{ chars: string; bytes: number }> = [];
+// Keyed by field path. Bounded by the schema, not by the data.
+const suffixCache = new Map<string, { chars: string; bytes: number }>();
 
 function header(length: number): string {
   const cached = headerCache[length];
@@ -38,12 +39,12 @@ function header(length: number): string {
   return built;
 }
 
-function suffix(field: number): { chars: string; bytes: number } {
-  const cached = suffixCache[field];
+function suffix(field: string): { chars: string; bytes: number } {
+  const cached = suffixCache.get(field);
   if (cached !== undefined) return cached;
   const encoded = encoder.encode(fieldSuffix(field));
   const built = { chars: bytesToChars(encoded), bytes: encoded.length };
-  suffixCache[field] = built;
+  suffixCache.set(field, built);
   return built;
 }
 
@@ -59,10 +60,10 @@ export function encodeMarker(payload: string): string {
  * trailing field ordinal. The entity part is encoded once per owner and its
  * characters reused, so a marked string costs two cache lookups and a concat.
  */
-export function markerBuilder(base: string): (field: number) => string {
+export function markerBuilder(base: string): (field: string) => string {
   const baseLength = encoder.encode(base).length;
   const baseChars = bytesToChars(encoder.encode(base));
-  return (field: number) => {
+  return (field: string) => {
     const tail = suffix(field);
     const length = baseLength + tail.bytes;
     if (length > MAX_PAYLOAD_BYTES) return '';

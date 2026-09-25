@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { describeElement, server, stamp, stamped } from './helpers.js';
+import { describeElement, entityBlocks, fieldOf, server, stamp, stamped } from './helpers.js';
 
 describe('single object', () => {
   it('takes the smallest element wrapping all of its text', () => {
@@ -187,8 +187,7 @@ describe('one entity rendered more than once', () => {
       `<section class="hero"><h1>${p.title}</h1><p>${p.blurb}</p></section>` +
         `<aside class="rail"><h3>${p.title}</h3><p>${p.blurb}</p></aside>`,
     );
-    const stampedElements = [...document.querySelectorAll('[data-stamp-id="p1"]')];
-    expect(stampedElements.map(describeElement)).toEqual(['section.hero', 'aside.rail']);
+    expect(entityBlocks('p1').map(describeElement)).toEqual(['section.hero', 'aside.rail']);
   });
 
   it('still stamps a list rendered twice on one page', () => {
@@ -203,11 +202,12 @@ describe('one entity rendered more than once', () => {
         .join('') +
       '</ul>';
     stamp(list('server') + list('island'));
-    expect([...document.querySelectorAll('[data-stamp-id="p1"]')].map(describeElement)).toEqual([
+    expect(entityBlocks('p1').map(describeElement)).toEqual([
       'li.server-card',
       'li.island-card',
     ]);
-    expect(document.querySelectorAll('[data-stamp-id]')).toHaveLength(4);
+    expect(entityBlocks('p1')).toHaveLength(2);
+    expect(entityBlocks('p2')).toHaveLength(2);
   });
 
   it('leaves a single rendering with a nested entity alone', () => {
@@ -240,7 +240,7 @@ describe('repeated renderings inside one container', () => {
         `<section class="b"><h1>${p.title}</h1><p>${p.blurb}</p></section>` +
         `</main>`,
     );
-    expect([...document.querySelectorAll('[data-stamp-id="p1"]')].map(describeElement)).toEqual([
+    expect(entityBlocks('p1').map(describeElement)).toEqual([
       'section.a',
       'section.b',
     ]);
@@ -264,7 +264,7 @@ describe('repeated renderings inside one container', () => {
         `</div>`,
     );
     expect(describeElement(stamped('p1'))).toBe('article.card');
-    expect(document.querySelectorAll('[data-stamp-id="p1"]')).toHaveLength(1);
+    expect(entityBlocks('p1')).toHaveLength(1);
   });
 
   it('handles a rendering that shows only some of the fields', () => {
@@ -275,7 +275,7 @@ describe('repeated renderings inside one container', () => {
         `<section class="teaser"><h2>${p.title}</h2></section>` +
         `</main>`,
     );
-    expect([...document.querySelectorAll('[data-stamp-id="p1"]')].map(describeElement)).toEqual([
+    expect(entityBlocks('p1').map(describeElement)).toEqual([
       'section.full',
       'h2',
     ]);
@@ -291,7 +291,7 @@ describe('repeated renderings inside one container', () => {
       products.map((p) => `<li class="${cls}-card"><h3>${p.title}</h3><p>${p.blurb}</p></li>`).join('') +
       `</ul>`;
     stamp(`<main>${list('a')}${list('b')}${list('c')}</main>`);
-    expect([...document.querySelectorAll('[data-stamp-id="p1"]')].map(describeElement)).toEqual([
+    expect(entityBlocks('p1').map(describeElement)).toEqual([
       'li.a-card',
       'li.b-card',
       'li.c-card',

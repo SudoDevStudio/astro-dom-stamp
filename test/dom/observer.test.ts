@@ -10,6 +10,7 @@ function start(options: Partial<Parameters<typeof resolveOptions>[0]> = {}): voi
   const resolved = resolveOptions({ read: ['id', 'uid', 'sku'], devWarnings: false, ...options });
   running = createStamper({
     attributes: resolved.attributes,
+    fieldAttribute: resolved.fieldAttribute,
     stripAfterStamp: resolved.stripAfterStamp,
     devWarnings: resolved.devWarnings,
   });

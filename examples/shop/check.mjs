@@ -59,8 +59,29 @@ async function stampedOn(path) {
   page.on('pageerror', (e) => messages.push(`pageerror: ${e.message}`));
   await page.goto(ORIGIN + path, { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);
-  const found = await page.evaluate(() =>
-    [...document.querySelectorAll('[data-stamp-id]')].map((el) => el.getAttribute('data-stamp-id')),
+  // Field elements repeat their entity's id, so a block is the outermost
+  // element carrying a given id. Containment alone would drop a nested entity,
+  // which legitimately sits inside its parent's block.
+  const found = await page.evaluate(() => {
+    const all = [...document.querySelectorAll('[data-stamp-id]')];
+    return all
+      .filter((el) => {
+        const id = el.getAttribute('data-stamp-id');
+        return !all.some(
+          (other) => other !== el && other.getAttribute('data-stamp-id') === id && other.contains(el),
+        );
+      })
+      .map((el) => el.getAttribute('data-stamp-id'));
+  });
+  const fields = await page.evaluate(() =>
+    [...document.querySelectorAll('[data-stamp-field]')].slice(0, 200).map((el) => ({
+      field: el.getAttribute('data-stamp-field'),
+      type: el.getAttribute('data-stamp-type'),
+      id: el.getAttribute('data-stamp-id'),
+    })),
+  );
+  const unstampedCards = await page.evaluate(
+    () => [...document.querySelectorAll('.card')].filter((el) => !el.hasAttribute('data-stamp-id')).length,
   );
   const cards = await page.evaluate(() => ({
     all: document.querySelectorAll('.card').length,
@@ -68,7 +89,7 @@ async function stampedOn(path) {
     svelte: document.querySelectorAll('.svelte-card[data-stamp-id]').length,
   }));
   await browser.close();
-  return { found, messages, cards };
+  return { found, messages, cards, fields, unstampedCards };
 }
 
 build(true);
@@ -101,7 +122,17 @@ await withServer(async () => {
 
   const product = await stampedOn('/product/p0');
   check('the detail page stamps the product and its variants', product.found.length > 1,
-    product.found.join(' '));
+    [...new Set(product.found)].join(' '));
+
+  // What an editor needs to build an update call from one element.
+  const title = product.fields.find((f) => f.field === 'title');
+  check('a field element names its field, type and id',
+    title?.type === 'product' && title?.id === 'p0',
+    JSON.stringify(title));
+  const variantLabel = product.fields.find((f) => f.type === 'variant');
+  check('a nested entity\'s field points at the nested entity',
+    variantLabel?.field === 'label' && variantLabel?.id?.startsWith('p0v'),
+    JSON.stringify(variantLabel));
 
   const adminPage = await stampedOn('/admin/');
   check('an excluded path stamps nothing', adminPage.found.length === 0);
@@ -114,9 +145,8 @@ await withServer(async () => {
     `${frameworks.cards.vue} of 3 cards`);
   check('the Svelte island is stamped after its own browser fetch', frameworks.cards.svelte === 12,
     `${frameworks.cards.svelte} of 12 cards`);
-  check('every card on the page is stamped',
-    frameworks.found.length === frameworks.cards.all,
-    `${frameworks.found.length} of ${frameworks.cards.all}`);
+  check('every card on the page is stamped', frameworks.unstampedCards === 0,
+    `${frameworks.unstampedCards} unstamped of ${frameworks.cards.all}`);
   check('no framework complaint on the Vue and Svelte page',
     frameworks.messages.filter((m) => /error|warn|hydrat/i.test(m)).length === 0,
     frameworks.messages.slice(0, 2).join(' | '));

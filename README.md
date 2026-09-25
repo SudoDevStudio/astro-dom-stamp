@@ -1,8 +1,8 @@
 # astro-dom-stamp
 
-Puts `data-stamp-id` and friends on the elements your fetched data renders
-into, so a custom visual editor knows what it is looking at. No template edits,
-and nothing at all in a production build.
+Marks up the elements your fetched data renders into — which entity they belong
+to and which field they show — so a custom visual editor knows what it is
+looking at. No template edits, and nothing at all in a production build.
 
 ```sh
 npm install @sudodevstudio/astro-dom-stamp
@@ -78,15 +78,42 @@ and warns about a `sources` entry that matched nothing.
 | Nested entities | Each level takes its own element |
 | Same entity rendered twice | Each rendering stamped separately |
 
-An object gets one attribute per `read` key it actually carries:
+An object gets one attribute per `read` key it actually carries. On top of that,
+every element rendering one of its values is named with the field it shows, and
+repeats the entity so a single element is enough to act on:
 
 ```html
-<li class="card" data-stamp-id="p1" data-stamp-sku="SKU-1001">…</li>
+<article data-stamp-type="product" data-stamp-id="p0" data-stamp-sku="SKU-1000">
+  <h1 data-stamp-field="title"       data-stamp-type="product" data-stamp-id="p0">Rugged Runner</h1>
+  <p  data-stamp-field="description" data-stamp-type="product" data-stamp-id="p0">…</p>
+  <ul>
+    <li data-stamp-field="label" data-stamp-type="variant" data-stamp-id="p0v0">Bone / 39</li>
+  </ul>
+</article>
 ```
 
-Two entities landing on one element: the first wins, and the second is reported
-in the console. An attribute already in your markup is never overwritten — which
-is why the prefix is namespaced rather than a bare `data-id`.
+```js
+// an editor, or an MCP call, from one element
+const el = event.target.closest('[data-stamp-field]');
+update({
+  type:  el.dataset.stampType,   // variant
+  id:    el.dataset.stampId,     // p0v0
+  field: el.dataset.stampField,  // label
+  value: next,
+});
+```
+
+The field is a path relative to its nearest owner: `title`, `tags.0`,
+`details.fabric`. A nested object with its own id is its own entity, so the
+variant above is named `label`, not `variants.0.label`.
+
+Put a type key in `read` to get `data-stamp-type` — a conventional `_type`
+works, and is cleaned up rather than becoming `data-stamp--type`.
+
+Two entities on one element, or two fields in one element: the first wins and
+the second is reported in the console. An attribute already in your markup is
+never overwritten — which is why the prefix is namespaced rather than a bare
+`data-id`.
 
 ## Reading data back
 
@@ -108,7 +135,7 @@ reaches the build-time transform, which carries a Rust parser.
 
 | Option | Type | Default | What it does |
 | --- | --- | --- | --- |
-| `read` | `string[]` | **required** | Keys that become attributes. `productId` → `data-stamp-product-id`. |
+| `read` | `string[]` | **required** | Keys that become attributes. `productId` → `data-stamp-product-id`, `_type` → `data-stamp-type`. |
 | `enabled` | `boolean` | `false` | `true` for the edit build. `false` registers nothing. |
 | `sources` | `string[]` | `[]` | Extra calls to wrap. `*` matches one path segment. |
 | `skipFields` | `string[]` | see below | Extra keys never encoded. |
@@ -150,7 +177,7 @@ counts); anything under `meta`, `metadata`, `openGraph`, `seo`; and your own
 
 Nothing in production. In edit mode, measured on Node 22.22: about 7 ms to
 encode a 1000-product response, about 3 ms for the first browser scan of an
-800-element page, and about 12 bytes of gzipped HTML per marker.
+800-element page, and about 15 bytes of gzipped HTML per marker.
 
 ## Try it
 
