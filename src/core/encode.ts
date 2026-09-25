@@ -7,6 +7,13 @@ import type { Stamp } from './types.js';
 export interface EncodeSettings {
   read: string[];
   skipFields: ReadonlySet<string>;
+  /**
+   * Carry the field's path rather than a counter. Either way the marker has to
+   * say which value it came from, because a value appearing twice is how the
+   * browser tells two renderings of one entity apart — but only the path is
+   * useful to an editor, and only the path costs real bytes.
+   */
+  deepStamps?: boolean;
 }
 
 const MAX_DEPTH = 64;
@@ -33,6 +40,7 @@ interface ListSlot {
 interface WalkState {
   read: string[];
   skip: ReadonlySet<string>;
+  deep: boolean;
   copy: boolean;
   seen: WeakSet<object>;
 }
@@ -45,6 +53,7 @@ export function encode<T>(value: T, settings: EncodeSettings): T {
   const state: WalkState = {
     read: settings.read,
     skip: settings.skipFields,
+    deep: settings.deepStamps === true,
     copy: false,
     seen: new WeakSet(),
   };
@@ -62,6 +71,7 @@ export function encodeResult<T>(value: T, settings: EncodeSettings): T {
   const state: WalkState = {
     read: settings.read,
     skip: settings.skipFields,
+    deep: settings.deepStamps === true,
     copy: true,
     seen: new WeakSet(),
   };
@@ -97,6 +107,8 @@ function walk(
 interface OwnerMarker {
   stamp: Stamp;
   build: (field: string) => string;
+  /** Counter used in place of a path when `deepStamps` is off. */
+  next: number;
 }
 
 /** `title`, or `details.color` when the value sits below its owner. */
@@ -127,7 +139,7 @@ function walkObject(
   if (fields !== null) {
     const stamp: Stamp = { fields };
     if (slot) stamp.list = { ref: (slot.box.ref ??= nextListRef()), index: slot.index };
-    current = { stamp, build: markerBuilder(serializeEntity(stamp)) };
+    current = { stamp, build: markerBuilder(serializeEntity(stamp)), next: 0 };
   }
   // A new owner restarts the path; otherwise values keep the incoming one.
   const base = fields !== null ? '' : prefix;
@@ -142,7 +154,8 @@ function walkObject(
     if (typeof value === 'string') {
       let next = value;
       if (current !== null && !opaque && !shouldSkipKey(key, state.skip) && !shouldSkipValue(value)) {
-        if (!alreadyOwned(value, current)) next = value + current.build(joinPath(base, key));
+        const field = state.deep ? joinPath(base, key) : String(current.next++);
+        if (!alreadyOwned(value, current)) next = value + current.build(field);
       }
       if (next !== value && !state.copy) {
         frozen ??= Object.isFrozen(node);
@@ -194,7 +207,8 @@ function walkArray(
     if (typeof value === 'string') {
       let next = value;
       if (owner !== null && !opaque && !shouldSkipValue(value)) {
-        if (!alreadyOwned(value, owner)) next = value + owner.build(joinPath(prefix, i));
+        const field = state.deep ? joinPath(prefix, i) : String(owner.next++);
+        if (!alreadyOwned(value, owner)) next = value + owner.build(field);
       }
       if (next !== value && !state.copy) {
         frozen ??= Object.isFrozen(node);

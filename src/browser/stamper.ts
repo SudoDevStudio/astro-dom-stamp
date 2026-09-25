@@ -6,8 +6,12 @@ import { resolvePlacements, type Occurrence } from './placement.js';
 
 export interface StamperConfig {
   attributes: Record<string, string>;
-  /** Attribute naming which field an element renders, e.g. `data-stamp-field`. */
-  fieldAttribute: string;
+  /**
+   * Attribute naming which field an element renders, e.g. `data-stamp-field`.
+   * Absent when `deepStamps` is off, in which case the marker carries a counter
+   * rather than a name and there is nothing useful to write.
+   */
+  fieldAttribute?: string;
   stripAfterStamp: boolean;
   devWarnings: boolean;
   /** Path patterns where the stamper does nothing at all. */
@@ -82,7 +86,7 @@ export function createStamper(config: StamperConfig): Stamper {
     applying = true;
     try {
       apply(resolvePlacements(occurrences), config, warnedKeys);
-      writeFields(occurrences, config, warnedKeys);
+      if (config.fieldAttribute) writeFields(occurrences, config.fieldAttribute, config, warnedKeys);
       if (config.stripAfterStamp) {
         for (const text of markedText) text.data = stripMarkers(text.data);
         for (const element of markedAlt) {
@@ -196,6 +200,7 @@ function apply(
  */
 function writeFields(
   occurrences: Occurrence[],
+  fieldAttribute: string,
   config: StamperConfig,
   warnedKeys: Set<string>,
 ): void {
@@ -223,8 +228,8 @@ function writeFields(
     }
     claimed.set(occurrence.element, claim);
 
-    if (!occurrence.element.hasAttribute(config.fieldAttribute)) {
-      occurrence.element.setAttribute(config.fieldAttribute, field);
+    if (!occurrence.element.hasAttribute(fieldAttribute)) {
+      occurrence.element.setAttribute(fieldAttribute, field);
     }
     writeAttributes(occurrence.element, occurrence.stamp, config);
   }

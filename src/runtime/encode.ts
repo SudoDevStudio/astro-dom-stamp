@@ -23,7 +23,11 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
  */
 export function createEncoder(options: AstroDomStampOptions): Encoder {
   const resolved = resolveOptions(options);
-  const settings: EncodeSettings = { read: resolved.read, skipFields: resolved.skipFields };
+  const settings: EncodeSettings = {
+    read: resolved.read,
+    skipFields: resolved.skipFields,
+    deepStamps: resolved.deepStamps,
+  };
   const excluded = compileUrlPatterns(resolved.excludeUrls);
 
   // On the server the path comes from the middleware's request scope, because a

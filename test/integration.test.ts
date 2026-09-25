@@ -215,3 +215,43 @@ describe('the runtime module knows about excluded paths', () => {
     expect(code).toContain('"excludeUrls":["/admin/*"]');
   });
 });
+
+describe('deepStamps', () => {
+  async function build(deepStamps?: boolean) {
+    const { args, configs, injected } = setupArgs();
+    const integration = astroDomStamp({
+      read: ['id'],
+      enabled: true,
+      ...(deepStamps === undefined ? {} : { deepStamps }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (integration.hooks['astro:config:setup'] as any)(args);
+    const plugin = (
+      configs[0] as {
+        vite: {
+          plugins: Array<{
+            name: string;
+            resolveId(id: string): string | null;
+            load(id: string): string | null;
+          }>;
+        };
+      }
+    ).vite.plugins.find((p) => p.name === 'astro-dom-stamp:runtime')!;
+    return {
+      runtime: plugin.load(plugin.resolveId('virtual:astro-dom-stamp/runtime')!)!,
+      script: injected[0]!,
+    };
+  }
+
+  it('is off unless asked for', async () => {
+    const { runtime, script } = await build();
+    expect(runtime).toContain('"deepStamps":false');
+    expect(script).not.toContain('fieldAttribute');
+  });
+
+  it('reaches the encoder and the browser script together', async () => {
+    const { runtime, script } = await build(true);
+    expect(runtime).toContain('"deepStamps":true');
+    expect(script).toContain('"fieldAttribute":"data-stamp-field"');
+  });
+});

@@ -23,6 +23,8 @@ export default defineConfig({
       // `_type` becomes data-stamp-type, so an editor knows which
       // collection an element belongs to.
       read: ['_type', 'id', 'sku'],
+      // Name the field each element renders, for field-level editing.
+      deepStamps: true,
       enabled: editing,
       // Nothing runs on these paths: no markers in the response, no scanning.
       excludeUrls: ['/admin/*'],

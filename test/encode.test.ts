@@ -5,7 +5,7 @@ import { createEncoder } from '../src/runtime/encode.js';
 import { setScopeProvider } from '../src/runtime/scope.js';
 import { hasMarker } from '../src/core/marker.js';
 import type { Stamp } from '../src/core/types.js';
-import { defaultSettings, settingsFor } from './settings.js';
+import { deepSettings, defaultSettings, settingsFor } from './settings.js';
 
 function stampOf(value: string): Stamp | undefined {
   return decodeStamps(value)[0];
@@ -248,9 +248,25 @@ describe('data encoded twice', () => {
   });
 });
 
-describe('field paths', () => {
+describe('data encoded twice', () => {
+  it('does not stack markers when a marked response is fetched again', () => {
+    const onServer = encode([{ id: 'p1', sku: 'AB-1', title: 'Shoe' }], defaultSettings);
+    const overTheWire = JSON.parse(JSON.stringify(onServer)) as typeof onServer;
+    const inBrowser = encode(overTheWire, defaultSettings);
+    expect(decodeStamps(inBrowser[0]!.title)).toHaveLength(1);
+    expect(inBrowser[0]!.title).toBe(onServer[0]!.title);
+  });
+
+  it('still marks a string that carries a different entity marker', () => {
+    const a = encode({ id: 'a1', title: 'One' }, defaultSettings);
+    const combined = encode({ id: 'b1', title: a.title }, defaultSettings);
+    expect(decodeStamps(combined.title)).toHaveLength(2);
+  });
+});
+
+describe('field paths, with deepStamps', () => {
   it('names each value by its key', () => {
-    const data = encode({ id: '5', title: 'Shoe', blurb: 'Soft' }, defaultSettings);
+    const data = encode({ id: '5', title: 'Shoe', blurb: 'Soft' }, deepSettings);
     expect(stampOf(data.title)?.field).toBe('title');
     expect(stampOf(data.blurb)?.field).toBe('blurb');
   });
@@ -258,7 +274,7 @@ describe('field paths', () => {
   it('restarts the path at a nested owner', () => {
     const data = encode(
       { id: 'p', title: 'Shoe', variant: { id: 'v', label: 'Red', note: 'New' } },
-      defaultSettings,
+      deepSettings,
     );
     expect(stampOf(data.title)?.field).toBe('title');
     expect(stampOf(data.variant.label)?.field).toBe('label');
@@ -268,14 +284,14 @@ describe('field paths', () => {
   it('keeps the path when a nested object has no id of its own', () => {
     const data = encode(
       { id: 'p', details: { fabric: 'Suede', care: { note: 'Wipe clean' } } },
-      defaultSettings,
+      deepSettings,
     );
     expect(stampOf(data.details.fabric)?.field).toBe('details.fabric');
     expect(stampOf(data.details.care.note)?.field).toBe('details.care.note');
   });
 
   it('indexes items of a string array', () => {
-    const data = encode({ id: '5', tags: ['Warm', 'Winter'] }, defaultSettings);
+    const data = encode({ id: '5', tags: ['Warm', 'Winter'] }, deepSettings);
     expect(stampOf(data.tags[0]!)?.field).toBe('tags.0');
     expect(stampOf(data.tags[1]!)?.field).toBe('tags.1');
   });
@@ -286,7 +302,7 @@ describe('field paths', () => {
         { id: 'a', title: 'One', blurb: 'x' },
         { id: 'b', title: 'Two', blurb: 'y' },
       ],
-      defaultSettings,
+      deepSettings,
     );
     expect(stampOf(data[0]!.title)?.field).toBe('title');
     expect(stampOf(data[1]!.title)?.field).toBe('title');
@@ -294,9 +310,9 @@ describe('field paths', () => {
   });
 
   it('keeps ordinals stable when a response is encoded twice', () => {
-    const onServer = encode({ id: '5', title: 'Shoe', blurb: 'Soft' }, defaultSettings);
+    const onServer = encode({ id: '5', title: 'Shoe', blurb: 'Soft' }, deepSettings);
     const overTheWire = JSON.parse(JSON.stringify(onServer)) as typeof onServer;
-    const inBrowser = encode(overTheWire, defaultSettings);
+    const inBrowser = encode(overTheWire, deepSettings);
     expect(inBrowser.title).toBe(onServer.title);
     expect(inBrowser.blurb).toBe(onServer.blurb);
   });
@@ -333,5 +349,30 @@ describe('excludeUrls on the server', () => {
     setScopeProvider(() => ({ skip: true }));
     const plain = createEncoder({ read: ['id'] });
     expect(hasMarker(plain.__encode({ id: '5', title: 'Shoe' }).title)).toBe(true);
+  });
+});
+
+describe('without deepStamps', () => {
+  it('carries a counter instead of a path, so the payload stays short', () => {
+    const data = encode({ id: '5', title: 'Shoe', blurb: 'Soft' }, defaultSettings);
+    expect(stampOf(data.title)?.field).toBe('0');
+    expect(stampOf(data.blurb)?.field).toBe('1');
+  });
+
+  it('still tells two values of one owner apart', () => {
+    const data = encode({ id: '5', title: 'Shoe', blurb: 'Soft' }, defaultSettings);
+    expect(stampOf(data.title)?.field).not.toBe(stampOf(data.blurb)?.field);
+  });
+
+  it('counts across a nested object that has no id', () => {
+    const data = encode({ id: '5', title: 'Shoe', details: { fabric: 'Suede' } }, defaultSettings);
+    expect(stampOf(data.title)?.field).toBe('0');
+    expect(stampOf(data.details.fabric)?.field).toBe('1');
+  });
+
+  it('produces a shorter marker than deepStamps does', () => {
+    const shallow = encode({ id: '5', description: 'Soft' }, defaultSettings);
+    const deep = encode({ id: '5', description: 'Soft' }, deepSettings);
+    expect(deep.description.length).toBeGreaterThan(shallow.description.length);
   });
 });

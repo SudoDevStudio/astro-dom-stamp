@@ -4,17 +4,21 @@ import { resolveOptions, type AstroDomStampOptions } from '../../src/core/option
 
 const READ = ['id', 'uid', 'sku'];
 
-export function server<T>(data: T, read: string[] = READ): T {
-  const resolved = resolveOptions({ read });
-  return encode(data, { read: resolved.read, skipFields: resolved.skipFields });
+export function server<T>(data: T, read: string[] = READ, deepStamps = true): T {
+  const resolved = resolveOptions({ read, deepStamps });
+  return encode(data, {
+    read: resolved.read,
+    skipFields: resolved.skipFields,
+    deepStamps: resolved.deepStamps,
+  });
 }
 
 export function stamp(html: string, options: Partial<AstroDomStampOptions> = {}): void {
   document.body.innerHTML = html;
-  const resolved = resolveOptions({ read: READ, devWarnings: false, ...options });
+  const resolved = resolveOptions({ read: READ, devWarnings: false, deepStamps: true, ...options });
   const config: StamperConfig = {
     attributes: resolved.attributes,
-    fieldAttribute: resolved.fieldAttribute,
+    ...(resolved.deepStamps ? { fieldAttribute: resolved.fieldAttribute } : {}),
     stripAfterStamp: resolved.stripAfterStamp,
     devWarnings: resolved.devWarnings,
   };

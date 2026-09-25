@@ -68,6 +68,7 @@ function runtimeModulePlugin(options: AstroDomStampOptions, resolved: ResolvedOp
     read: resolved.read,
     skipFields: [...resolved.skipFields],
     excludeUrls: resolved.excludeUrls,
+    deepStamps: resolved.deepStamps,
   });
   return {
     name: 'astro-dom-stamp:runtime',
@@ -113,7 +114,7 @@ function middlewareModule(resolved: ResolvedOptions): string {
 function stamperEntry(resolved: ResolvedOptions): string {
   const config = JSON.stringify({
     attributes: resolved.attributes,
-    fieldAttribute: resolved.fieldAttribute,
+    ...(resolved.deepStamps ? { fieldAttribute: resolved.fieldAttribute } : {}),
     stripAfterStamp: resolved.stripAfterStamp,
     devWarnings: resolved.devWarnings,
     excludeUrls: resolved.excludeUrls,

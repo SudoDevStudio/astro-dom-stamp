@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { PREFIX } from '../src/core/alphabet.js';
 import { encodeMarker, findMarkers, stripMarkers } from '../src/core/marker.js';
 import { encode } from '../src/core/encode.js';
-import { defaultSettings } from './settings.js';
+import { deepSettings, defaultSettings } from './settings.js';
 
 /**
  * The risk the kickoff calls out: zero-width characters sitting against the
@@ -57,13 +57,13 @@ describe.each(SAMPLES)('%s', (_label, text) => {
 
 describe('non-ASCII data', () => {
   it('encodes Gurmukhi content and Gurmukhi ids together', () => {
-    const data = encode({ id: 'ਜੁੱਤੀ-5', title: 'ਨਰਮ ਜੁੱਤੀ', blurb: 'ਬਹੁਤ ਆਰਾਮਦਾਇਕ' }, defaultSettings);
+    const data = encode({ id: 'ਜੁੱਤੀ-5', title: 'ਨਰਮ ਜੁੱਤੀ', blurb: 'ਬਹੁਤ ਆਰਾਮਦਾਇਕ' }, deepSettings);
     expect(stripMarkers(data.title)).toBe('ਨਰਮ ਜੁੱਤੀ');
     expect(findMarkers(data.title)[0]?.payload).toBe('v1|id=ਜੁੱਤੀ-5|f=title');
   });
 
   it('keeps an emoji id intact', () => {
-    const data = encode({ id: '👟-1', title: 'Shoe' }, defaultSettings);
+    const data = encode({ id: '👟-1', title: 'Shoe' }, deepSettings);
     expect(findMarkers(data.title)[0]?.payload).toBe('v1|id=👟-1|f=title');
   });
 

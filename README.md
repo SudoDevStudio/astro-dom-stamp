@@ -78,9 +78,21 @@ and warns about a `sources` entry that matched nothing.
 | Nested entities | Each level takes its own element |
 | Same entity rendered twice | Each rendering stamped separately |
 
-An object gets one attribute per `read` key it actually carries. On top of that,
-every element rendering one of its values is named with the field it shows, and
-repeats the entity so a single element is enough to act on:
+An object gets one attribute per `read` key it actually carries:
+
+```html
+<article data-stamp-type="product" data-stamp-id="p0" data-stamp-sku="SKU-1000">…</article>
+```
+
+## Field-level editing
+
+Knowing the entity is enough to highlight a block. To edit one value you also
+need to know which value it is, so `deepStamps` names the element rendering
+each one and repeats the entity there:
+
+```js
+astroDomStamp({ read: ['_type', 'id', 'sku'], enabled: editing, deepStamps: true });
+```
 
 ```html
 <article data-stamp-type="product" data-stamp-id="p0" data-stamp-sku="SKU-1000">
@@ -109,6 +121,10 @@ variant above is named `label`, not `variants.0.label`.
 
 Put a type key in `read` to get `data-stamp-type` — a conventional `_type`
 works, and is cleaned up rather than becoming `data-stamp--type`.
+
+It is off by default because it costs about 4 more gzipped bytes per marker.
+With it off the marker carries a short counter instead of the path, which is
+still enough to tell two renderings of one entity apart.
 
 Two entities on one element, or two fields in one element: the first wins and
 the second is reported in the console. An attribute already in your markup is
@@ -139,6 +155,7 @@ reaches the build-time transform, which carries a Rust parser.
 | `enabled` | `boolean` | `false` | `true` for the edit build. `false` registers nothing. |
 | `sources` | `string[]` | `[]` | Extra calls to wrap. `*` matches one path segment. |
 | `skipFields` | `string[]` | see below | Extra keys never encoded. |
+| `deepStamps` | `boolean` | `false` | Also name the field each element renders. |
 | `excludeUrls` | `string[]` | `[]` | Paths where nothing happens at all, e.g. `['/admin/*']`. |
 | `attributePrefix` | `string` | `data-stamp-` | Must start with `data-`. |
 | `include` / `exclude` | `string[]` | `src/**`, not `node_modules` | Files the transform covers. |
@@ -177,7 +194,8 @@ counts); anything under `meta`, `metadata`, `openGraph`, `seo`; and your own
 
 Nothing in production. In edit mode, measured on Node 22.22: about 7 ms to
 encode a 1000-product response, about 3 ms for the first browser scan of an
-800-element page, and about 15 bytes of gzipped HTML per marker.
+800-element page, and about 13 bytes of gzipped HTML per marker — 17 with
+`deepStamps`.
 
 ## Try it
 

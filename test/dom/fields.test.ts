@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest';
-import { describeElement, fieldOf, server, stamp, stamped } from './helpers.js';
+import { describeElement, entityBlocks, fieldOf, server, stamp, stamped } from './helpers.js';
 
 describe('field attributes', () => {
   it('names the field on the element rendering it', () => {
@@ -86,5 +86,34 @@ describe('an object type, for an editor that needs the collection', () => {
     expect(heading.getAttribute('data-stamp-type')).toBe('product');
     expect(heading.getAttribute('data-stamp-id')).toBe('p1');
     expect(heading.getAttribute('data-stamp-field')).toBe('title');
+  });
+});
+
+describe('without deepStamps', () => {
+  it('writes no field attribute at all', () => {
+    const p = server({ id: 'p1', title: 'Shoe', blurb: 'Soft' }, ['id', 'uid', 'sku'], false);
+    stamp(`<article class="card"><h1>${p.title}</h1><p>${p.blurb}</p></article>`, {
+      deepStamps: false,
+    });
+    expect(document.querySelector('[data-stamp-field]')).toBeNull();
+    expect(document.querySelector('h1')!.hasAttribute('data-stamp-id')).toBe(false);
+  });
+
+  it('still stamps the entity block', () => {
+    const p = server({ id: 'p1', title: 'Shoe', blurb: 'Soft' }, ['id', 'uid', 'sku'], false);
+    stamp(`<article class="card"><h1>${p.title}</h1><p>${p.blurb}</p></article>`, {
+      deepStamps: false,
+    });
+    expect(describeElement(stamped('p1'))).toBe('article.card');
+  });
+
+  it('still tells two renderings of one entity apart', () => {
+    const p = server({ id: 'p1', title: 'Shoe', blurb: 'Soft' }, ['id', 'uid', 'sku'], false);
+    stamp(
+      `<main><section class="a"><h1>${p.title}</h1><p>${p.blurb}</p></section>` +
+        `<section class="b"><h1>${p.title}</h1><p>${p.blurb}</p></section></main>`,
+      { deepStamps: false },
+    );
+    expect(entityBlocks('p1').map(describeElement)).toEqual(['section.a', 'section.b']);
   });
 });

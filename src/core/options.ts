@@ -26,6 +26,13 @@ export interface AstroDomStampOptions {
   include?: string[];
   exclude?: string[];
   /**
+   * Also mark the element rendering each individual value with the field it
+   * shows, e.g. `data-stamp-field="title"`, and repeat the entity there so one
+   * element is enough to act on. Off by default: it is what field-level editing
+   * needs, and it costs roughly a third more bytes per marker.
+   */
+  deepStamps?: boolean;
+  /**
    * Paths where nothing should happen: no markers in the response, no scanning
    * in the browser. `*` matches any characters, e.g. `['/admin/*', '/checkout/*']`.
    */
@@ -60,6 +67,7 @@ export const FIELD_ATTRIBUTE = 'field';
 export interface ResolvedOptions {
   read: string[];
   attributePrefix: string;
+  deepStamps: boolean;
   /** Attribute naming the field, e.g. `data-stamp-field`. */
   fieldAttribute: string;
   attributes: Record<string, string>;
@@ -115,6 +123,7 @@ export function resolveOptions(options: AstroDomStampOptions): ResolvedOptions {
   return {
     read: [...read],
     attributePrefix,
+    deepStamps: options.deepStamps ?? false,
     fieldAttribute: `${attributePrefix}${FIELD_ATTRIBUTE}`,
     attributes,
     enabled: options.enabled ?? false,
