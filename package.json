@@ -1,9 +1,9 @@
 {
   "name": "@sudodevstudio/astro-dom-stamp",
   "version": "0.1.0",
-  "description": "Stamp data-* attributes onto DOM elements rendered from fetched data, for custom Astro visual editors. Zero cost in production.",
+  "description": "Stamp data-* attributes onto DOM elements rendered from fetched data.",
   "license": "MIT",
-  "author": "SudoDevStudio",
+  "author": "Maninderpreet Singh",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/SudoDevStudio/astro-dom-stamp.git"
