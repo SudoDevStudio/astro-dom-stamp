@@ -3,6 +3,7 @@
   "compilerOptions": {
     "noEmit": false,
     "allowImportingTsExtensions": false,
+    "inlineSources": true,
     "outDir": "dist",
     "rootDir": "src"
   },

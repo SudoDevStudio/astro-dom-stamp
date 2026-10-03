@@ -44,7 +44,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "example": "npm run build && npm --workspace astro-dom-stamp-example-shop run dev:edit",
-    "verify": "npm run build && node examples/shop/check.mjs && node examples/shop/check-dev.mjs"
+    "verify": "npm run build && node examples/shop/check.mjs && node examples/shop/check-dev.mjs",
+    "prepublishOnly": "npm run build && npm test"
   },
   "peerDependencies": {
     "astro": "^7.0.0"
