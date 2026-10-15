@@ -15,6 +15,11 @@ const VIRTUAL_RUNTIME = 'virtual:astro-dom-stamp/runtime';
 const RESOLVED_RUNTIME = '\0' + VIRTUAL_RUNTIME;
 const VIRTUAL_MIDDLEWARE = 'virtual:astro-dom-stamp/middleware';
 const RESOLVED_MIDDLEWARE = '\0' + VIRTUAL_MIDDLEWARE;
+const VIRTUAL_SCOPE = 'virtual:astro-dom-stamp/scope';
+const RESOLVED_SCOPE = '\0' + VIRTUAL_SCOPE;
+// Astro's module for the project's `src/fetch.ts`, when it has one.
+const ASTRO_FETCHABLE = '\0virtual:astro:fetchable';
+const USER_FETCH_HANDLER = /^export \{ default \} from (['"])(.+)\1;?\s*$/;
 
 /**
  * With `enabled: false` this registers nothing, so a production build is
@@ -76,10 +81,20 @@ function runtimeModulePlugin(options: AstroDomStampOptions, resolved: ResolvedOp
     resolveId(id: string) {
       if (id === VIRTUAL_RUNTIME) return RESOLVED_RUNTIME;
       if (id === VIRTUAL_MIDDLEWARE) return RESOLVED_MIDDLEWARE;
+      if (id === VIRTUAL_SCOPE) return RESOLVED_SCOPE;
       return null;
     },
+    // A project with its own `src/fetch.ts` decides which of Astro's handlers
+    // run, and may leave out `middleware()`. Scoping the handler itself means
+    // excluded paths stay clean either way.
+    transform(code: string, id: string) {
+      if (id !== ASTRO_FETCHABLE || resolved.excludeUrls.length === 0) return null;
+      const match = USER_FETCH_HANDLER.exec(code.trim());
+      return match ? fetchHandlerModule(match[2]!) : null;
+    },
     load(id: string) {
-      if (id === RESOLVED_MIDDLEWARE) return middlewareModule(resolved);
+      if (id === RESOLVED_SCOPE) return scopeModule(resolved);
+      if (id === RESOLVED_MIDDLEWARE) return middlewareModule();
       if (id !== RESOLVED_RUNTIME) return null;
       // Goes through createEncoder, not the raw encode functions, because the
       // transform hands these a promise as often as a value.
@@ -97,7 +112,7 @@ function runtimeModulePlugin(options: AstroDomStampOptions, resolved: ResolvedOp
  * Runs in the Node server only, so `node:async_hooks` is safe here — it never
  * reaches a client bundle.
  */
-function middlewareModule(resolved: ResolvedOptions): string {
+function scopeModule(resolved: ResolvedOptions): string {
   const patterns = JSON.stringify(resolved.excludeUrls);
   return [
     `import { AsyncLocalStorage } from 'node:async_hooks';`,
@@ -106,8 +121,26 @@ function middlewareModule(resolved: ResolvedOptions): string {
     `const patterns = compileUrlPatterns(${patterns});`,
     `const storage = new AsyncLocalStorage();`,
     `setScopeProvider(() => storage.getStore());`,
-    `export const onRequest = (context, next) =>`,
-    `  storage.run({ skip: matchesUrl(context.url.pathname, patterns) }, next);`,
+    `export const runInScope = (pathname, fn) =>`,
+    `  storage.run({ skip: matchesUrl(pathname, patterns) }, fn);`,
+  ].join('\n');
+}
+
+function middlewareModule(): string {
+  return [
+    `import { runInScope } from '${VIRTUAL_SCOPE}';`,
+    `export const onRequest = (context, next) => runInScope(context.url.pathname, next);`,
+  ].join('\n');
+}
+
+function fetchHandlerModule(source: string): string {
+  return [
+    `import handler from ${JSON.stringify(source)};`,
+    `import { runInScope } from '${VIRTUAL_SCOPE}';`,
+    `export default {`,
+    `  fetch: (request, ...rest) =>`,
+    `    runInScope(new URL(request.url).pathname, () => handler.fetch(request, ...rest)),`,
+    `};`,
   ].join('\n');
 }
 

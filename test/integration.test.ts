@@ -158,11 +158,21 @@ describe('excludeUrls', () => {
     await (integration.hooks['astro:config:setup'] as any)(args.args);
     const plugin = (
       args.configs[0] as {
-        vite: { plugins: Array<{ name: string; resolveId(id: string): string | null; load(id: string): string | null }> };
+        vite: {
+          plugins: Array<{
+            name: string;
+            resolveId(id: string): string | null;
+            load(id: string): string | null;
+            transform(code: string, id: string): string | null;
+          }>;
+        };
       }
     ).vite.plugins.find((p) => p.name === 'astro-dom-stamp:runtime')!;
     return { ...args, plugin };
   }
+
+  const FETCHABLE = '\0virtual:astro:fetchable';
+  const USER_FETCH = `export { default } from '/project/src/fetch.ts';`;
 
   it('adds no middleware when no path is excluded', async () => {
     expect((await setup()).middleware).toHaveLength(0);
@@ -177,11 +187,32 @@ describe('excludeUrls', () => {
 
   it('serves a middleware that scopes the decision to the request', async () => {
     const { plugin } = await setup(['/admin/*']);
-    const code = plugin.load(plugin.resolveId('virtual:astro-dom-stamp/middleware')!)!;
-    expect(code).toContain('AsyncLocalStorage');
-    expect(code).toContain('"/admin/*"');
-    expect(code).toContain('export const onRequest');
-    expect(code).toContain('storage.run');
+    const middleware = plugin.load(plugin.resolveId('virtual:astro-dom-stamp/middleware')!)!;
+    expect(middleware).toContain('export const onRequest');
+    expect(middleware).toContain('runInScope(context.url.pathname');
+    const scope = plugin.load(plugin.resolveId('virtual:astro-dom-stamp/scope')!)!;
+    expect(scope).toContain('AsyncLocalStorage');
+    expect(scope).toContain('"/admin/*"');
+    expect(scope).toContain('storage.run');
+  });
+
+  it('scopes a custom src/fetch.ts, which may never call middleware()', async () => {
+    const { plugin } = await setup(['/admin/*']);
+    const code = plugin.transform(USER_FETCH, FETCHABLE)!;
+    expect(code).toContain(`import handler from "/project/src/fetch.ts";`);
+    expect(code).toContain('runInScope(new URL(request.url).pathname');
+    expect(code).toContain('handler.fetch(request, ...rest)');
+  });
+
+  it("leaves Astro's default fetch handler alone", async () => {
+    const { plugin } = await setup(['/admin/*']);
+    const builtIn = `import { DefaultFetchHandler } from 'astro/app/fetch/default-handler';\nexport default new DefaultFetchHandler();\nexport const isDefaultFetchHandler = true;`;
+    expect(plugin.transform(builtIn, FETCHABLE)).toBeNull();
+  });
+
+  it('wraps no fetch handler when no path is excluded', async () => {
+    const { plugin } = await setup();
+    expect(plugin.transform(USER_FETCH, FETCHABLE)).toBeNull();
   });
 
   it('gives the browser script the same patterns', async () => {
